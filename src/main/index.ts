@@ -5,6 +5,7 @@ import { Player } from './player'
 import { PlaylistManager } from './playlistManager'
 import { SyncManager } from './syncManager'
 import { ConfigManager } from './configManager'
+import { DeviceManager } from './deviceManager'
 
 let win: BrowserWindow | null = null
 const configManager = new ConfigManager()
@@ -12,6 +13,7 @@ const musicLibrary = new MusicLibrary()
 const player = new Player()
 const playlistManager = new PlaylistManager()
 const syncManager = new SyncManager(musicLibrary, playlistManager)
+const deviceManager = new DeviceManager()
 
 function createWindow() {
   win = new BrowserWindow({
@@ -32,6 +34,8 @@ function createWindow() {
 
   musicLibrary.setWindow(win)
   player.setWindow(win)
+  syncManager.setWindow(win)
+  deviceManager.setWindow(win)
 
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:5173')
@@ -189,4 +193,96 @@ ipcMain.handle('config:addMusicDir', async (_, dir: string) => {
 ipcMain.handle('config:removeMusicDir', async (_, dir: string) => {
   configManager.removeMusicDir(dir)
   return true
+})
+
+// 设备检测相关
+ipcMain.handle('device:detect', async () => {
+  return await deviceManager.detectDevices()
+})
+
+ipcMain.handle('device:scanMusic', async (_, deviceId: string) => {
+  return await deviceManager.scanDeviceMusic(deviceId)
+})
+
+ipcMain.handle('device:getPlaylists', async (_, deviceId: string) => {
+  return await deviceManager.getDevicePlaylists(deviceId)
+})
+
+ipcMain.handle('device:getSyncState', async (_, deviceId: string) => {
+  return deviceManager.getDeviceSyncState(deviceId)
+})
+
+ipcMain.handle('device:updateName', async (_, deviceId: string, name: string) => {
+  deviceManager.updateDeviceName(deviceId, name)
+  return true
+})
+
+ipcMain.handle('device:setFolders', async (_, deviceId: string, musicFolder: string, playlistFolder: string) => {
+  deviceManager.setDeviceFolders(deviceId, musicFolder, playlistFolder)
+  return true
+})
+
+ipcMain.handle('device:forget', async (_, deviceId: string) => {
+  deviceManager.forgetDevice(deviceId)
+  return true
+})
+
+// 设备同步相关
+ipcMain.handle('device:previewSync', async (_, deviceId: string, options: any) => {
+  try {
+    let device = deviceManager.getDevice(deviceId)
+    if (!device) {
+      await deviceManager.detectDevices()
+      device = deviceManager.getDevice(deviceId)
+    }
+    if (!device) {
+      return { error: '设备未找到，请重新检测设备' }
+    }
+    return await syncManager.previewSyncToDevice(device, options)
+  } catch (e: any) {
+    console.error('Preview sync error:', e)
+    return { error: e.message || '预览失败' }
+  }
+})
+
+ipcMain.handle('device:syncTo', async (_, deviceId: string, options: any) => {
+  try {
+    let device = deviceManager.getDevice(deviceId)
+    if (!device) {
+      await deviceManager.detectDevices()
+      device = deviceManager.getDevice(deviceId)
+    }
+    if (!device) {
+      return { success: false, message: '设备未找到，请重新检测设备', songsCopied: 0, songsSkipped: 0, songsDeleted: 0, playlistsSynced: 0, errors: ['设备未找到'], totalSize: 0, duration: 0 }
+    }
+    const result = await syncManager.syncLibraryToDevice(device, options)
+    if (result.success) {
+      deviceManager.updateDeviceSyncState(deviceId, {
+        lastSyncTime: Date.now(),
+        syncedSongs: [],
+        syncedPlaylists: []
+      })
+    }
+    return result
+  } catch (e: any) {
+    console.error('Sync error:', e)
+    return { success: false, message: e.message || '同步失败', songsCopied: 0, songsSkipped: 0, songsDeleted: 0, playlistsSynced: 0, errors: [e.message], totalSize: 0, duration: 0 }
+  }
+})
+
+ipcMain.handle('device:importFrom', async (_, deviceId: string, options: any) => {
+  try {
+    let device = deviceManager.getDevice(deviceId)
+    if (!device) {
+      await deviceManager.detectDevices()
+      device = deviceManager.getDevice(deviceId)
+    }
+    if (!device) {
+      return { success: false, message: '设备未找到，请重新检测设备', songsCopied: 0, songsSkipped: 0, songsDeleted: 0, playlistsSynced: 0, errors: ['设备未找到'], totalSize: 0, duration: 0 }
+    }
+    return await syncManager.importFromDevice(device, options)
+  } catch (e: any) {
+    console.error('Import error:', e)
+    return { success: false, message: e.message || '导入失败', songsCopied: 0, songsSkipped: 0, songsDeleted: 0, playlistsSynced: 0, errors: [e.message], totalSize: 0, duration: 0 }
+  }
 })

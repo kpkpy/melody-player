@@ -6,6 +6,55 @@ declare module '*.vue' {
   export default component
 }
 
+interface DeviceInfo {
+  id: string
+  drive: string
+  label: string
+  type: 'usb' | 'fixed' | 'network' | 'unknown'
+  totalSize: number
+  freeSize: number
+  usedSize: number
+  fileSystem?: string
+  serialNumber?: string
+  vendor?: string
+  model?: string
+  musicFolder?: string
+  playlistFolder?: string
+  songCount: number
+  playlistCount: number
+  lastSyncTime?: number
+  customName?: string
+  isKnown: boolean
+}
+
+interface SyncPreview {
+  toCopyCount: number
+  toDeleteCount: number
+  playlistsToSync: { id: string; name: string; songCount: number }[]
+  totalSize: number
+  freeSpaceAfter: number
+  error?: string
+}
+
+interface LibrarySyncResult {
+  success: boolean
+  message: string
+  songsCopied: number
+  songsSkipped: number
+  songsDeleted: number
+  playlistsSynced: number
+  errors: string[]
+  totalSize: number
+  duration: number
+}
+
+interface SyncState {
+  deviceId: string
+  lastSyncTime: number
+  syncedSongs: string[]
+  syncedPlaylists: string[]
+}
+
 interface ElectronAPI {
   app: {
     ready: () => Promise<void>
@@ -34,6 +83,21 @@ interface ElectronAPI {
     importM3UToPlaylist: (playlistId: string, songs: any[]) => Promise<boolean>
     exportAll: () => Promise<string | null>
     importAll: () => Promise<number>
+    onProgress: (callback: (progress: { phase: string; current: number; total: number; message: string }) => void) => (() => void)
+  }
+  device: {
+    detect: () => Promise<DeviceInfo[]>
+    scanMusic: (deviceId: string) => Promise<{ musicFolders: string[]; playlistFolder: string | null; totalSongs: number; totalPlaylists: number }>
+    getPlaylists: (deviceId: string) => Promise<{ name: string; path: string; songCount: number }[]>
+    getSyncState: (deviceId: string) => Promise<SyncState | null>
+    updateName: (deviceId: string, name: string) => Promise<boolean>
+    setFolders: (deviceId: string, musicFolder: string, playlistFolder: string) => Promise<boolean>
+    forget: (deviceId: string) => Promise<boolean>
+    previewSync: (deviceId: string, options: { syncSongs: boolean; syncPlaylists: boolean; deleteRemoved: boolean }) => Promise<SyncPreview>
+    syncTo: (deviceId: string, options: { syncSongs: boolean; syncPlaylists: boolean; deleteRemoved: boolean }) => Promise<LibrarySyncResult>
+    importFrom: (deviceId: string, options: { importSongs: boolean; importPlaylists: boolean }) => Promise<LibrarySyncResult>
+    onChange: (callback: (data: { event: string; device: DeviceInfo }) => void) => (() => void)
+    onScanProgress: (callback: (progress: { phase: string; current: number; total: number; message: string }) => void) => (() => void)
   }
   window: {
     minimize: () => Promise<void>

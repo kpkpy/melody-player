@@ -45,6 +45,41 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('sync:importM3UToPlaylist', playlistId, songs),
     exportAll: () => ipcRenderer.invoke('sync:exportAll'),
     importAll: () => ipcRenderer.invoke('sync:importAll'),
+    onProgress: (callback: (progress: { phase: string; current: number; total: number; message: string }) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: { phase: string; current: number; total: number; message: string }) => {
+        callback(progress)
+      }
+      ipcRenderer.on('sync:progress', handler)
+      return () => ipcRenderer.removeListener('sync:progress', handler)
+    },
+  },
+
+  device: {
+    detect: () => ipcRenderer.invoke('device:detect'),
+    scanMusic: (deviceId: string) => ipcRenderer.invoke('device:scanMusic', deviceId),
+    getPlaylists: (deviceId: string) => ipcRenderer.invoke('device:getPlaylists', deviceId),
+    getSyncState: (deviceId: string) => ipcRenderer.invoke('device:getSyncState', deviceId),
+    updateName: (deviceId: string, name: string) => ipcRenderer.invoke('device:updateName', deviceId, name),
+    setFolders: (deviceId: string, musicFolder: string, playlistFolder: string) => 
+      ipcRenderer.invoke('device:setFolders', deviceId, musicFolder, playlistFolder),
+    forget: (deviceId: string) => ipcRenderer.invoke('device:forget', deviceId),
+    previewSync: (deviceId: string, options: any) => ipcRenderer.invoke('device:previewSync', deviceId, options),
+    syncTo: (deviceId: string, options: any) => ipcRenderer.invoke('device:syncTo', deviceId, options),
+    importFrom: (deviceId: string, options: any) => ipcRenderer.invoke('device:importFrom', deviceId, options),
+    onChange: (callback: (data: { event: string; device: any }) => void) => {
+      const handler = (_event: IpcRendererEvent, data: { event: string; device: any }) => {
+        callback(data)
+      }
+      ipcRenderer.on('device:change', handler)
+      return () => ipcRenderer.removeListener('device:change', handler)
+    },
+    onScanProgress: (callback: (progress: { phase: string; current: number; total: number; message: string }) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: { phase: string; current: number; total: number; message: string }) => {
+        callback(progress)
+      }
+      ipcRenderer.on('device:scanProgress', handler)
+      return () => ipcRenderer.removeListener('device:scanProgress', handler)
+    },
   },
 
   window: {
