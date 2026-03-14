@@ -1,7 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { useMusicStore } from '@/stores/music'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
 import TitleBar from '@/components/TitleBar.vue'
+
+const musicStore = useMusicStore()
+
+onMounted(async () => {
+  await window.electron.app.ready()
+  musicStore.loadLibrary()
+})
 </script>
 
 <template>

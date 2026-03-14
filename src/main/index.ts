@@ -4,8 +4,10 @@ import { MusicLibrary } from './musicLibrary'
 import { Player } from './player'
 import { PlaylistManager } from './playlistManager'
 import { SyncManager } from './syncManager'
+import { ConfigManager } from './configManager'
 
 let win: BrowserWindow | null = null
+const configManager = new ConfigManager()
 const musicLibrary = new MusicLibrary()
 const player = new Player()
 const playlistManager = new PlaylistManager()
@@ -38,6 +40,19 @@ function createWindow() {
     win.loadFile(join(__dirname, '../dist/index.html'))
   }
 }
+
+let autoScanned = false
+
+ipcMain.handle('app:ready', async () => {
+  if (autoScanned) return
+  autoScanned = true
+  
+  const savedDirs = configManager.getMusicDirs()
+  if (savedDirs.length > 0) {
+    await musicLibrary.scan(savedDirs)
+    playlistManager.setSongs(musicLibrary.getSongs())
+  }
+})
 
 app.whenReady().then(() => {
   protocol.registerFileProtocol('audio', (request, callback) => {
@@ -146,4 +161,24 @@ ipcMain.handle('window:maximize', async () => {
 
 ipcMain.handle('window:close', async () => {
   win?.close()
+})
+
+// 配置相关
+ipcMain.handle('config:getMusicDirs', async () => {
+  return configManager.getMusicDirs()
+})
+
+ipcMain.handle('config:setMusicDirs', async (_, dirs: string[]) => {
+  configManager.setMusicDirs(dirs)
+  return true
+})
+
+ipcMain.handle('config:addMusicDir', async (_, dir: string) => {
+  configManager.addMusicDir(dir)
+  return true
+})
+
+ipcMain.handle('config:removeMusicDir', async (_, dir: string) => {
+  configManager.removeMusicDir(dir)
+  return true
 })

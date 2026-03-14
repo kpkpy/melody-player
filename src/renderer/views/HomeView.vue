@@ -12,8 +12,10 @@ onMounted(() => {
 })
 
 const playSong = (song: any) => {
-  playerStore.play(song)
-}
+    const allSongs = musicStore.songs
+    const index = allSongs.findIndex(s => s.id === song.id)
+    playerStore.setPlaylist(allSongs, index >= 0 ? index : 0)
+  }
 </script>
 
 <template>

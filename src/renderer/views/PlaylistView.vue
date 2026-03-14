@@ -29,8 +29,9 @@ const loadPlaylist = () => {
 }
 
 const playSong = (song: any) => {
-  playerStore.play(song)
-}
+    const index = songs.value.findIndex(s => s.id === song.id)
+    playerStore.setPlaylist(songs.value, index >= 0 ? index : 0)
+  }
 
 const removeSong = async (songId: string) => {
   await playlistStore.removeSong(playlist.value.id, songId)

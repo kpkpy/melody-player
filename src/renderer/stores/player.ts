@@ -10,6 +10,8 @@ export const usePlayerStore = defineStore('player', () => {
   const title = ref('')
   const artist = ref('')
   const cover = ref('')
+  const playlist = ref<any[]>([])
+  const currentIndex = ref(-1)
   
   let audio: HTMLAudioElement | null = null
 
@@ -28,7 +30,7 @@ export const usePlayerStore = defineStore('player', () => {
       
       audio.addEventListener('ended', () => {
         isPlaying.value = false
-        next()
+        playNext()
       })
       
       audio.addEventListener('play', () => {
@@ -47,13 +49,20 @@ export const usePlayerStore = defineStore('player', () => {
     return audio
   }
 
-  const play = async (song: any) => {
+  const play = async (song: any, index?: number) => {
     const a = initAudio()
     
     currentSong.value = song
     title.value = song.title
     artist.value = song.artist
     cover.value = song.cover || ''
+    
+    if (index !== undefined) {
+      currentIndex.value = index
+    } else if (playlist.value.length > 0) {
+      const foundIndex = playlist.value.findIndex(s => s.id === song.id)
+      currentIndex.value = foundIndex >= 0 ? foundIndex : -1
+    }
     
     if (song.audioUrl) {
       a.src = song.audioUrl
@@ -62,6 +71,14 @@ export const usePlayerStore = defineStore('player', () => {
       } catch (e) {
         console.error('Play error:', e)
       }
+    }
+  }
+
+  const setPlaylist = (songs: any[], startIndex: number = 0) => {
+    playlist.value = songs
+    currentIndex.value = startIndex
+    if (songs.length > 0 && songs[startIndex]) {
+      play(songs[startIndex], startIndex)
     }
   }
 
@@ -104,11 +121,33 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   const previous = () => {
-    // TODO: 实现上一首
+    if (playlist.value.length === 0 || currentIndex.value <= 0) {
+      seek(0)
+      return
+    }
+    const newIndex = currentIndex.value - 1
+    const song = playlist.value[newIndex]
+    if (song) {
+      play(song, newIndex)
+    }
+  }
+
+  const playNext = () => {
+    if (playlist.value.length === 0) return
+    if (currentIndex.value >= playlist.value.length - 1) {
+      const song = playlist.value[0]
+      play(song, 0)
+    } else {
+      const newIndex = currentIndex.value + 1
+      const song = playlist.value[newIndex]
+      if (song) {
+        play(song, newIndex)
+      }
+    }
   }
 
   const next = () => {
-    // TODO: 实现下一首
+    playNext()
   }
 
   return {
@@ -120,6 +159,8 @@ export const usePlayerStore = defineStore('player', () => {
     title,
     artist,
     cover,
+    playlist,
+    currentIndex,
     play,
     pause,
     resume,
@@ -129,5 +170,6 @@ export const usePlayerStore = defineStore('player', () => {
     seek,
     previous,
     next,
+    setPlaylist,
   }
 })

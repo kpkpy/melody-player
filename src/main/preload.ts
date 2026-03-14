@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 contextBridge.exposeInMainWorld('electron', {
+  app: {
+    ready: () => ipcRenderer.invoke('app:ready'),
+  },
+
   library: {
     scan: (paths: string[]) => ipcRenderer.invoke('library:scan', paths),
     getSongs: () => ipcRenderer.invoke('library:getSongs'),
@@ -46,5 +50,12 @@ contextBridge.exposeInMainWorld('electron', {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
+  },
+
+  config: {
+    getMusicDirs: () => ipcRenderer.invoke('config:getMusicDirs'),
+    setMusicDirs: (dirs: string[]) => ipcRenderer.invoke('config:setMusicDirs', dirs),
+    addMusicDir: (dir: string) => ipcRenderer.invoke('config:addMusicDir', dir),
+    removeMusicDir: (dir: string) => ipcRenderer.invoke('config:removeMusicDir', dir),
   },
 })

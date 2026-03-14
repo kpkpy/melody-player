@@ -21,8 +21,9 @@ const filteredSongs = computed(() => {
 })
 
 const playSong = (song: any) => {
-  playerStore.play(song)
-}
+    const index = filteredSongs.value.findIndex(s => s.id === song.id)
+    playerStore.setPlaylist(filteredSongs.value, index >= 0 ? index : 0)
+  }
 </script>
 
 <template>

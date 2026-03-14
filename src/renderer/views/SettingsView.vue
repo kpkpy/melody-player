@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, toRaw } from 'vue'
 import { useMusicStore } from '@/stores/music'
 
 const musicStore = useMusicStore()
 const newDir = ref('')
 const musicDirs = ref<string[]>([])
 
-const addDir = () => {
+onMounted(async () => {
+  musicDirs.value = await window.electron.config.getMusicDirs()
+})
+
+const addDir = async () => {
   if (newDir.value && !musicDirs.value.includes(newDir.value)) {
     musicDirs.value.push(newDir.value)
+    await window.electron.config.setMusicDirs(toRaw(musicDirs.value))
     newDir.value = ''
   }
 }
 
-const removeDir = (index: number) => {
+const removeDir = async (index: number) => {
   musicDirs.value.splice(index, 1)
+  await window.electron.config.setMusicDirs(toRaw(musicDirs.value))
 }
 
 const scanAll = async () => {

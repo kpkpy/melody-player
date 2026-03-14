@@ -7,6 +7,9 @@ declare module '*.vue' {
 }
 
 interface ElectronAPI {
+  app: {
+    ready: () => Promise<void>
+  }
   library: {
     scan: (paths: string[]) => Promise<{ count: number; errors: string[] }>
     getSongs: () => Promise<any[]>
@@ -35,6 +38,12 @@ interface ElectronAPI {
     minimize: () => Promise<void>
     maximize: () => Promise<void>
     close: () => Promise<void>
+  }
+  config: {
+    getMusicDirs: () => Promise<string[]>
+    setMusicDirs: (dirs: string[]) => Promise<boolean>
+    addMusicDir: (dir: string) => Promise<boolean>
+    removeMusicDir: (dir: string) => Promise<boolean>
   }
 }
 
