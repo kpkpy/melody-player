@@ -10,6 +10,8 @@ const activeTab = ref<'cover' | 'lyrics' | 'visualizer'>('cover')
 const visualizerStyle = ref<'vu' | 'spectrum' | 'oscilloscope'>('vu')
 
 const lyrics = ref<string[]>([])
+const dominantColors = ref<string[]>(['#e94560', '#ff8a80'])
+const bgStyle = ref({})
 
 const progress = computed(() => {
   if (playerStore.duration === 0) return 0
@@ -355,6 +357,7 @@ watch(isPanelOpen, (open) => {
   if (open) {
     initAudioContext()
     connectAnalyser()
+    extractCoverColors()
     setTimeout(() => {
       drawVisualizer()
     }, 100)
@@ -365,6 +368,12 @@ watch(isPanelOpen, (open) => {
     }
   }
 })
+
+watch(() => playerStore.cover, (cover) => {
+  if (cover && isPanelOpen.value) {
+    extractCoverColors()
+  }
+}, { immediate: true })
 
 watch(activeTab, (tab) => {
   if (tab === 'visualizer' && isPanelOpen.value) {
@@ -383,6 +392,99 @@ watch(() => playerStore.currentSong, (song) => {
   }
 })
 
+const extractCoverColors = () => {
+  if (!playerStore.cover) {
+    dominantColors.value = ['#e94560', '#ff8a80']
+    updateBgStyle()
+    return
+  }
+  
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    const size = 100
+    canvas.width = size
+    canvas.height = size
+    ctx.drawImage(img, 0, 0, size, size)
+    
+    const imageData = ctx.getImageData(0, 0, size, size)
+    const pixels = imageData.data
+    
+    const colorMap = new Map<string, number>()
+    
+    for (let i = 0; i < pixels.length; i += 16) {
+      const r = pixels[i]
+      const g = pixels[i + 1]
+      const b = pixels[i + 2]
+      
+      const qr = Math.round(r / 32) * 32
+      const qg = Math.round(g / 32) * 32
+      const qb = Math.round(b / 32) * 32
+      
+      const key = `${qr},${qg},${qb}`
+      colorMap.set(key, (colorMap.get(key) || 0) + 1)
+    }
+    
+    const sortedColors = Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([color]) => {
+        const [r, g, b] = color.split(',').map(Number)
+        return rgbToHex(r, g, b)
+      })
+    
+    if (sortedColors.length >= 2) {
+      dominantColors.value = sortedColors.slice(0, 2)
+    } else if (sortedColors.length === 1) {
+      dominantColors.value = [sortedColors[0], adjustBrightness(sortedColors[0], 30)]
+    }
+    
+    updateBgStyle()
+  }
+  img.onerror = () => {
+    dominantColors.value = ['#e94560', '#ff8a80']
+    updateBgStyle()
+  }
+  img.src = playerStore.cover
+}
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+  return '#' + [r, g, b].map(x => {
+    const hex = x.toString(16)
+    return hex.length === 1 ? '0' + hex : hex
+  }).join('')
+}
+
+const adjustBrightness = (hex: string, percent: number): string => {
+  const num = parseInt(hex.slice(1), 16)
+  const r = Math.min(255, Math.max(0, (num >> 16) + percent))
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + percent))
+  const b = Math.min(255, Math.max(0, (num & 0x0000FF) + percent))
+  return rgbToHex(r, g, b)
+}
+
+const updateBgStyle = () => {
+  const [color1, color2] = dominantColors.value
+  bgStyle.value = {
+    '--accent-color-1': color1,
+    '--accent-color-2': color2,
+    '--accent-color-1-light': hexToRgba(color1, 0.3),
+    '--accent-color-2-light': hexToRgba(color2, 0.3),
+  }
+}
+
+const hexToRgba = (hex: string, alpha: number): string => {
+  const num = parseInt(hex.slice(1), 16)
+  const r = (num >> 16) & 255
+  const g = (num >> 8) & 255
+  const b = num & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 onUnmounted(() => {
   if (animationId) {
     cancelAnimationFrame(animationId)
@@ -393,8 +495,13 @@ onUnmounted(() => {
 <template>
   <div class="player-container">
     <Transition name="fullscreen">
-      <div v-if="isPanelOpen" class="fullscreen-panel">
-        <div class="panel-bg"></div>
+      <div v-if="isPanelOpen" class="fullscreen-panel" :style="bgStyle">
+        <div class="panel-bg">
+          <div class="gradient-orb orb-1"></div>
+          <div class="gradient-orb orb-2"></div>
+          <div class="gradient-orb orb-3"></div>
+          <div class="gradient-overlay"></div>
+        </div>
         
         <button class="close-btn" @click="togglePanel">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -500,7 +607,7 @@ onUnmounted(() => {
     </Transition>
 
     <!-- 底部播放栏 -->
-    <div class="player-bar">
+    <div class="player-bar" :style="bgStyle">
       <div class="song-info" @click="togglePanel">
         <div class="cover" :style="{ backgroundImage: playerStore.cover ? `url(${playerStore.cover})` : 'none' }">
           <div v-if="!playerStore.cover" class="cover-placeholder">♪</div>
@@ -579,17 +686,68 @@ onUnmounted(() => {
 .panel-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #f0f4f8 0%, #e8ecf0 50%, #dce4ec 100%);
+  background: #f5f5f7;
   z-index: -1;
+  overflow: hidden;
 }
 
-.panel-bg::before {
-  content: '';
+.gradient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.6;
+  animation: float 20s ease-in-out infinite;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.4));
+  top: -10%;
+  left: -5%;
+  animation-delay: 0s;
+}
+
+.orb-2 {
+  width: 350px;
+  height: 350px;
+  background: var(--accent-color-2-light, rgba(255, 138, 128, 0.4));
+  top: 50%;
+  right: -10%;
+  animation-delay: -7s;
+}
+
+.orb-3 {
+  width: 300px;
+  height: 300px;
+  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.3));
+  bottom: -5%;
+  left: 30%;
+  animation-delay: -14s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.05);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+  75% {
+    transform: translate(20px, 30px) scale(1.02);
+  }
+}
+
+.gradient-overlay {
   position: absolute;
   inset: 0;
   background: 
-    radial-gradient(circle at 20% 30%, rgba(233, 69, 96, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(100, 150, 255, 0.08) 0%, transparent 40%);
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.8) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.6) 0%, transparent 40%);
+  backdrop-filter: blur(1px);
 }
 
 .close-btn {
@@ -672,10 +830,16 @@ onUnmounted(() => {
 
 .cover-glow {
   position: absolute;
-  inset: -40px;
-  background: radial-gradient(circle, rgba(233, 69, 96, 0.2) 0%, transparent 70%);
-  filter: blur(30px);
+  inset: -60px;
+  background: radial-gradient(circle, var(--accent-color-1-light, rgba(233, 69, 96, 0.3)) 0%, transparent 60%);
+  filter: blur(40px);
   z-index: -1;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
 }
 
 .large-cover {
@@ -736,7 +900,7 @@ onUnmounted(() => {
 
 .progress-fill-display {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 3px;
   transition: width 0.1s linear;
 }
@@ -745,11 +909,11 @@ onUnmounted(() => {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
+  width: 18px;
+  height: 18px;
+  background: white;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(233, 69, 96, 0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 0 0 3px var(--accent-color-1, var(--accent));
 }
 
 .time-display {
@@ -901,20 +1065,19 @@ onUnmounted(() => {
 .play-btn-lg {
   width: 80px;
   height: 80px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 8px 24px rgba(233, 69, 96, 0.3);
+  box-shadow: 0 8px 32px var(--accent-color-1-light, rgba(233, 69, 96, 0.3));
   transition: all 0.2s ease;
 }
 
 .play-btn-lg:hover {
-  background: var(--accent-hover);
   transform: scale(1.05);
-  box-shadow: 0 12px 32px rgba(233, 69, 96, 0.4);
+  box-shadow: 0 12px 40px var(--accent-color-1-light, rgba(233, 69, 96, 0.4));
 }
 
 /* 过渡动画 */
@@ -1053,28 +1216,27 @@ onUnmounted(() => {
 }
 
 .ctrl-btn:hover {
-  color: var(--accent);
+  color: var(--accent-color-1, var(--accent));
   transform: scale(1.1);
-  background: rgba(233, 69, 96, 0.1);
+  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.1));
 }
 
 .play-btn {
   width: 44px;
   height: 44px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+  box-shadow: 0 4px 12px var(--accent-color-1-light, rgba(233, 69, 96, 0.3));
   transition: all 0.2s ease;
 }
 
 .play-btn:hover {
-  background: var(--accent-hover);
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+  box-shadow: 0 6px 20px var(--accent-color-1-light, rgba(233, 69, 96, 0.4));
 }
 
 .progress-section {
@@ -1102,7 +1264,7 @@ onUnmounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 2px;
   transition: width 0.1s linear;
 }
@@ -1130,7 +1292,7 @@ onUnmounted(() => {
 
 .volume-fill {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 2px;
 }
 </style>
