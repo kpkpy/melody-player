@@ -153,12 +153,6 @@ const drawVisualizer = () => {
   
   animationId = requestAnimationFrame(drawVisualizer)
 }
-  } else if (visualizerStyle.value === 'oscilloscope') {
-    drawOscilloscope(ctx, timeData, width, height)
-  }
-  
-  animationId = requestAnimationFrame(drawVisualizer)
-}
 
 // 复古VU表
 const drawVU = (ctx: CanvasRenderingContext2D, data: Uint8Array, width: number, height: number) => {
