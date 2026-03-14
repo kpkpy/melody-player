@@ -695,50 +695,58 @@ onUnmounted(() => {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.6;
-  animation: float 20s ease-in-out infinite;
+  opacity: 0;
+  animation: fadeInOrb 0.8s ease forwards, var(--orb-animation);
+}
+
+@keyframes fadeInOrb {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 0.6; }
 }
 
 .orb-1 {
-  width: 400px;
-  height: 400px;
+  width: 500px;
+  height: 500px;
   background: var(--accent-color-1-light, rgba(233, 69, 96, 0.4));
-  top: -10%;
-  left: -5%;
-  animation-delay: 0s;
+  top: 20%;
+  left: 10%;
+  --orb-animation: floatOrb1 18s ease-in-out infinite 0.8s;
 }
 
 .orb-2 {
-  width: 350px;
-  height: 350px;
+  width: 400px;
+  height: 400px;
   background: var(--accent-color-2-light, rgba(255, 138, 128, 0.4));
-  top: 50%;
-  right: -10%;
-  animation-delay: -7s;
+  top: 60%;
+  right: 5%;
+  --orb-animation: floatOrb2 22s ease-in-out infinite 0.8s;
 }
 
 .orb-3 {
-  width: 300px;
-  height: 300px;
-  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.3));
-  bottom: -5%;
-  left: 30%;
-  animation-delay: -14s;
+  width: 350px;
+  height: 350px;
+  background: linear-gradient(135deg, var(--accent-color-1-light, rgba(233, 69, 96, 0.3)), var(--accent-color-2-light, rgba(255, 138, 128, 0.3)));
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  --orb-animation: floatOrb3 25s ease-in-out infinite 0.8s;
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  25% {
-    transform: translate(30px, -30px) scale(1.05);
-  }
-  50% {
-    transform: translate(-20px, 20px) scale(0.95);
-  }
-  75% {
-    transform: translate(20px, 30px) scale(1.02);
-  }
+@keyframes floatOrb1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(50px, 30px) scale(1.1); }
+  66% { transform: translate(-30px, -20px) scale(0.95); }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-40px, -40px) scale(1.05); }
+  66% { transform: translate(30px, 20px) scale(0.9); }
+}
+
+@keyframes floatOrb3 {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50% { transform: translateX(-50%) translateY(-30px) scale(1.15); }
 }
 
 .gradient-overlay {
@@ -856,7 +864,18 @@ onUnmounted(() => {
     0 20px 60px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.5) inset;
   transform-style: preserve-3d;
-  animation: coverFloat 6s ease-in-out infinite;
+  animation: coverFloat 6s ease-in-out infinite, coverFadeIn 0.5s ease;
+}
+
+@keyframes coverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) rotateY(-5deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
 }
 
 @keyframes coverFloat {
