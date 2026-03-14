@@ -81,7 +81,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, #f0f4f8 0%, #e8ecf0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -114,7 +114,7 @@ onMounted(async () => {
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  background: linear-gradient(135deg, #fff, #ccc);
+  background: linear-gradient(135deg, var(--accent), #ff8a80);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -127,7 +127,7 @@ onMounted(async () => {
   width: 40px;
   height: 40px;
   margin: 0 auto;
-  border: 3px solid rgba(255, 255, 255, 0.1);
+  border: 3px solid rgba(0, 0, 0, 0.1);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -149,7 +149,7 @@ onMounted(async () => {
 
 .loading-progress .progress-bar {
   height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 8px;
