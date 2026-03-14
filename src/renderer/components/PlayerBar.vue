@@ -43,6 +43,7 @@ let audioContext: AudioContext | null = null
 let analyser: AnalyserNode | null = null
 let animationId: number | null = null
 let sourceNode: MediaElementAudioSourceNode | null = null
+let isAudioConnected = false
 
 const vuLeft = ref(0)
 const vuRight = ref(0)
@@ -58,45 +59,41 @@ const initAudioContext = () => {
 }
 
 const connectAnalyser = () => {
+  if (!audioContext || !analyser) {
+    initAudioContext()
+  }
+  
   if (!audioContext || !analyser) return
   
   const audio = playerStore.getAudio()
-  if (audio && audio instanceof HTMLAudioElement && !sourceNode) {
+  if (!audio) {
+    console.log('No audio element found')
+    return
+  }
+  
+  if (audioContext.state === 'suspended') {
+    audioContext.resume()
+  }
+  
+  if (!isAudioConnected) {
     try {
       sourceNode = audioContext.createMediaElementSource(audio)
       sourceNode.connect(analyser)
       analyser.connect(audioContext.destination)
-    } catch (e) {
-      console.log('Audio already connected')
+      isAudioConnected = true
+      console.log('Audio connected to analyser')
+    } catch (e: any) {
+      console.log('Audio connection error:', e.message)
     }
-  }
-  
-  if (audioContext?.state === 'suspended') {
-    audioContext.resume()
   }
 }
 
 const drawVisualizer = () => {
-  if (!analyser || !canvasRef.value) return
+  if (!canvasRef.value) return
   
   const canvas = canvasRef.value
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  
-  const bufferLength = analyser.frequencyBinCount
-  const dataArray = new Uint8Array(bufferLength)
-  const timeData = new Uint8Array(bufferLength)
-  analyser.getByteFrequencyData(dataArray)
-  analyser.getByteTimeDomainData(timeData)
-  
-  // 计算VU值
-  let sum = 0
-  for (let i = 0; i < bufferLength; i++) {
-    sum += dataArray[i]
-  }
-  const avg = sum / bufferLength / 255
-  vuLeft.value = Math.min(1, avg * 1.5 + Math.random() * 0.05)
-  vuRight.value = Math.min(1, avg * 1.3 + Math.random() * 0.08)
   
   const dpr = window.devicePixelRatio || 1
   const displayWidth = canvas.offsetWidth || 400
@@ -112,6 +109,29 @@ const drawVisualizer = () => {
   if (width === 0 || height === 0) return
   
   ctx.clearRect(0, 0, width, height)
+  
+  let dataArray = new Uint8Array(128)
+  let timeData = new Uint8Array(128)
+  
+  if (analyser) {
+    const bufferLength = analyser.frequencyBinCount
+    dataArray = new Uint8Array(bufferLength)
+    timeData = new Uint8Array(bufferLength)
+    analyser.getByteFrequencyData(dataArray)
+    analyser.getByteTimeDomainData(timeData)
+    
+    let sum = 0
+    for (let i = 0; i < bufferLength; i++) {
+      sum += dataArray[i]
+    }
+    const avg = sum / bufferLength / 255
+    vuLeft.value = Math.min(1, avg * 1.5 + Math.random() * 0.05)
+    vuRight.value = Math.min(1, avg * 1.3 + Math.random() * 0.08)
+  } else {
+    // 没有音频数据时显示静态效果
+    vuLeft.value = 0.1
+    vuRight.value = 0.08
+  }
   
   if (visualizerStyle.value === 'vu') {
     drawVU(ctx, dataArray, width, height)
@@ -358,9 +378,11 @@ watch(isPanelOpen, (open) => {
     initAudioContext()
     connectAnalyser()
     extractCoverColors()
-    setTimeout(() => {
-      drawVisualizer()
-    }, 100)
+    if (activeTab.value === 'visualizer') {
+      setTimeout(() => {
+        drawVisualizer()
+      }, 100)
+    }
   } else {
     if (animationId) {
       cancelAnimationFrame(animationId)
@@ -377,10 +399,22 @@ watch(() => playerStore.cover, (cover) => {
 
 watch(activeTab, (tab) => {
   if (tab === 'visualizer' && isPanelOpen.value) {
+    initAudioContext()
+    connectAnalyser()
+    if (animationId) {
+      cancelAnimationFrame(animationId)
+    }
     setTimeout(() => drawVisualizer(), 50)
   } else if (animationId) {
     cancelAnimationFrame(animationId)
     animationId = null
+  }
+})
+
+watch(() => playerStore.isPlaying, (playing) => {
+  if (playing && activeTab.value === 'visualizer' && isPanelOpen.value) {
+    initAudioContext()
+    connectAnalyser()
   }
 })
 
