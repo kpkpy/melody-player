@@ -171,5 +171,6 @@ export const usePlayerStore = defineStore('player', () => {
     previous,
     next,
     setPlaylist,
+    getAudio: () => audio,
   }
 })
