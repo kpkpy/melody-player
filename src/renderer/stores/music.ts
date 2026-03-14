@@ -10,6 +10,7 @@ export interface Song {
   filePath: string
   audioUrl: string
   cover?: string
+  lyrics?: string
 }
 
 export interface ScanProgress {

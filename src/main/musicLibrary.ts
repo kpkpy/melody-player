@@ -14,6 +14,7 @@ export interface Song {
   filePath: string
   audioUrl: string
   cover?: string
+  lyrics?: string
 }
 
 export interface Album {
@@ -142,6 +143,20 @@ export class MusicLibrary {
       cover = `data:${pic.format};base64,${pic.data.toString('base64')}`
     }
 
+    let lyrics: string | undefined = undefined
+    if (metadata.native) {
+      for (const format of Object.values(metadata.native)) {
+        const tags = format as any[]
+        for (const tag of tags) {
+          if (tag.id === 'USLT' || tag.id === 'lyrics' || tag.id === 'LYRICS' || tag.id === 'unsynchronisedLyrics') {
+            lyrics = typeof tag.value === 'string' ? tag.value : tag.value?.text || tag.value?.lyrics
+            break
+          }
+        }
+        if (lyrics) break
+      }
+    }
+
     return {
       id,
       title: common.title || this.getFileName(filePath),
@@ -151,6 +166,7 @@ export class MusicLibrary {
       filePath,
       audioUrl: `audio://${filePath}`,
       cover,
+      lyrics,
     }
   }
 
@@ -197,6 +213,7 @@ export class MusicLibrary {
       filePath: song.filePath,
       audioUrl: song.audioUrl,
       cover: song.cover,
+      lyrics: song.lyrics,
     }))
   }
 
@@ -214,6 +231,7 @@ export class MusicLibrary {
         filePath: s.filePath,
         audioUrl: s.audioUrl,
         cover: s.cover,
+        lyrics: s.lyrics,
       })),
     }))
   }
@@ -232,6 +250,7 @@ export class MusicLibrary {
         filePath: s.filePath,
         audioUrl: s.audioUrl,
         cover: s.cover,
+        lyrics: s.lyrics,
       })),
     }))
   }
