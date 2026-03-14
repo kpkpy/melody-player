@@ -1173,11 +1173,13 @@ const oldImportAll = async () => {
   left: 50%;
   transform: translateX(-50%);
   padding: 14px 24px;
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--accent);
+  color: #fff;
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
   z-index: 100;
   max-width: 80%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 </style>
