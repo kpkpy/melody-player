@@ -89,26 +89,37 @@ const connectAnalyser = () => {
 }
 
 const drawVisualizer = () => {
-  if (!canvasRef.value) return
+  if (!canvasRef.value) {
+    animationId = requestAnimationFrame(drawVisualizer)
+    return
+  }
   
   const canvas = canvasRef.value
   const ctx = canvas.getContext('2d')
-  if (!ctx) return
+  if (!ctx) {
+    animationId = requestAnimationFrame(drawVisualizer)
+    return
+  }
   
   const dpr = window.devicePixelRatio || 1
-  const displayWidth = canvas.offsetWidth || 400
-  const displayHeight = canvas.offsetHeight || 200
+  let displayWidth = canvas.offsetWidth
+  let displayHeight = canvas.offsetHeight
   
-  canvas.width = displayWidth * dpr
-  canvas.height = displayHeight * dpr
+  if (displayWidth === 0 || displayHeight === 0) {
+    displayWidth = 600
+    displayHeight = 240
+    canvas.width = displayWidth * dpr
+    canvas.height = displayHeight * dpr
+  } else {
+    canvas.width = displayWidth * dpr
+    canvas.height = displayHeight * dpr
+  }
+  
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.scale(dpr, dpr)
   
   const width = displayWidth
   const height = displayHeight
-  
-  if (width === 0 || height === 0) return
-  
-  ctx.clearRect(0, 0, width, height)
   
   let dataArray = new Uint8Array(128)
   let timeData = new Uint8Array(128)
@@ -128,9 +139,8 @@ const drawVisualizer = () => {
     vuLeft.value = Math.min(1, avg * 1.5 + Math.random() * 0.05)
     vuRight.value = Math.min(1, avg * 1.3 + Math.random() * 0.08)
   } else {
-    // 没有音频数据时显示静态效果
-    vuLeft.value = 0.1
-    vuRight.value = 0.08
+    vuLeft.value = 0.15 + Math.random() * 0.05
+    vuRight.value = 0.12 + Math.random() * 0.04
   }
   
   if (visualizerStyle.value === 'vu') {
@@ -143,29 +153,49 @@ const drawVisualizer = () => {
   
   animationId = requestAnimationFrame(drawVisualizer)
 }
+  } else if (visualizerStyle.value === 'oscilloscope') {
+    drawOscilloscope(ctx, timeData, width, height)
+  }
+  
+  animationId = requestAnimationFrame(drawVisualizer)
+}
 
 // 复古VU表
 const drawVU = (ctx: CanvasRenderingContext2D, data: Uint8Array, width: number, height: number) => {
-  const barWidth = 30
-  const barHeight = height - 40
-  const gap = 80
+  // 背景 - 木纹面板
+  const bgGradient = ctx.createLinearGradient(0, 0, width, height)
+  bgGradient.addColorStop(0, '#3d2914')
+  bgGradient.addColorStop(0.5, '#4a3520')
+  bgGradient.addColorStop(1, '#3d2914')
+  ctx.fillStyle = bgGradient
+  ctx.fillRect(0, 0, width, height)
+  
+  // 边框装饰
+  ctx.strokeStyle = '#8b7355'
+  ctx.lineWidth = 4
+  ctx.strokeRect(2, 2, width - 4, height - 4)
+  
+  const barWidth = Math.min(30, width * 0.1)
+  const barHeight = height - 60
+  const gap = Math.min(80, width * 0.2)
   
   // 左声道
-  drawVUMeter(ctx, width/2 - gap - barWidth, 20, barWidth, barHeight, vuLeft.value, 'L')
+  drawVUMeter(ctx, width/2 - gap - barWidth, 30, barWidth, barHeight, vuLeft.value, 'L')
   // 右声道
-  drawVUMeter(ctx, width/2 + gap - barWidth/2, 20, barWidth, barHeight, vuRight.value, 'R')
+  drawVUMeter(ctx, width/2 + gap - barWidth/2, 30, barWidth, barHeight, vuRight.value, 'R')
   
   // 中间品牌
-  ctx.fillStyle = '#8b7355'
-  ctx.font = 'bold 24px Georgia, serif'
+  ctx.fillStyle = '#c4a574'
+  ctx.font = 'bold 20px Georgia, serif'
   ctx.textAlign = 'center'
-  ctx.fillText('STEREO', width/2, height/2 - 20)
-  ctx.font = '12px Georgia, serif'
-  ctx.fillText('VU METER', width/2, height/2 + 5)
+  ctx.fillText('STEREO', width/2, height/2 - 10)
+  ctx.font = '11px Georgia, serif'
+  ctx.fillStyle = '#8b7355'
+  ctx.fillText('VU METER', width/2, height/2 + 10)
   
   // 装饰螺丝
-  drawScrew(ctx, width/2 - 60, height/2 + 30)
-  drawScrew(ctx, width/2 + 60, height/2 + 30)
+  drawScrew(ctx, width/2 - 50, height/2 + 35)
+  drawScrew(ctx, width/2 + 50, height/2 + 35)
 }
 
 const drawVUMeter = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, value: number, label: string) => {
@@ -1016,8 +1046,6 @@ onUnmounted(() => {
 .visualizer-tab {
   width: 100%;
   max-width: 800px;
-  height: 100%;
-  max-height: 400px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1068,7 +1096,8 @@ onUnmounted(() => {
 
 .visualizer-canvas-container {
   flex: 1;
-  min-height: 200px;
+  min-height: 280px;
+  height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1081,7 +1110,6 @@ onUnmounted(() => {
 .visualizer-canvas {
   width: 100%;
   height: 100%;
-  min-height: 200px;
 }
 
 /* 底部控制 */
