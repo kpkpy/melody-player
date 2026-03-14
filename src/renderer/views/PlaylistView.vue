@@ -41,7 +41,7 @@ const removeSong = async (songId: string) => {
 
 <template>
   <div class="playlist-view" v-if="playlist">
-    <header class="playlist-header">
+    <header class="playlist-header animate-fade-in-up">
       <div class="playlist-cover">
         <div class="cover-placeholder">♪</div>
       </div>
@@ -51,11 +51,12 @@ const removeSong = async (songId: string) => {
       </div>
     </header>
 
-    <div class="song-list">
+    <TransitionGroup name="song-list" tag="div" class="song-list animate-fade-in-up delay-100">
       <div
         v-for="(song, index) in songs"
         :key="song.id"
         class="song-row"
+        :style="{ animationDelay: `${0.15 + index * 0.03}s` }"
         @dblclick="playSong(song)"
       >
         <span class="song-index">{{ index + 1 }}</span>
@@ -64,9 +65,9 @@ const removeSong = async (songId: string) => {
         <span class="song-duration">{{ Math.floor(song.duration / 60) }}:{{ String(song.duration % 60).padStart(2, '0') }}</span>
         <button class="remove-btn" @click="removeSong(song.id)">×</button>
       </div>
-    </div>
+    </TransitionGroup>
 
-    <div class="empty" v-if="songs.length === 0">
+    <div class="empty animate-fade-in-up" v-if="songs.length === 0">
       <p>歌单是空的，去音乐库添加歌曲吧</p>
       <router-link to="/library">浏览音乐库</router-link>
     </div>
@@ -83,6 +84,7 @@ const removeSong = async (songId: string) => {
   display: flex;
   gap: 30px;
   margin-bottom: 40px;
+  opacity: 0;
 }
 
 .playlist-cover {
@@ -120,6 +122,7 @@ const removeSong = async (songId: string) => {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   overflow: hidden;
+  opacity: 0;
 }
 
 .song-row {
@@ -187,5 +190,31 @@ const removeSong = async (songId: string) => {
   background: var(--accent);
   border-radius: 8px;
   color: white;
+  transition: all 0.2s ease;
+}
+
+.empty a:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+}
+
+/* 歌曲列表动画 */
+.song-list-enter-active,
+.song-list-leave-active {
+  transition: all 0.3s ease;
+}
+
+.song-list-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.song-list-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.song-list-move {
+  transition: transform 0.3s ease;
 }
 </style>

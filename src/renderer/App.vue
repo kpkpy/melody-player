@@ -7,6 +7,7 @@ import TitleBar from '@/components/TitleBar.vue'
 
 const musicStore = useMusicStore()
 const isAppReady = ref(false)
+const showContent = ref(false)
 const loadingText = ref('正在初始化...')
 
 onMounted(async () => {
@@ -19,51 +20,58 @@ onMounted(async () => {
   loadingText.value = '准备就绪'
   setTimeout(() => {
     isAppReady.value = true
+    setTimeout(() => {
+      showContent.value = true
+    }, 50)
   }, 200)
 })
 </script>
 
 <template>
-  <div v-if="!isAppReady" class="loading-screen">
-    <div class="loading-content">
-      <div class="loading-logo">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      </div>
-      <h1 class="loading-title">Melody Player</h1>
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-      </div>
-      <p class="loading-text">{{ loadingText }}</p>
-      <div v-if="musicStore.scanProgress" class="loading-progress">
-        <div class="progress-bar">
-          <div 
-            class="progress-fill" 
-            :style="{ width: `${musicStore.scanProgress.total > 0 ? (musicStore.scanProgress.current / musicStore.scanProgress.total * 100) : 0}%` }"
-          ></div>
+  <Transition name="loading-fade">
+    <div v-if="!isAppReady" class="loading-screen">
+      <div class="loading-content">
+        <div class="loading-logo">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
         </div>
-        <span class="progress-text">
-          {{ musicStore.scanProgress.current }} / {{ musicStore.scanProgress.total }}
-        </span>
+        <h1 class="loading-title">Melody Player</h1>
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+        </div>
+        <p class="loading-text">{{ loadingText }}</p>
+        <div v-if="musicStore.scanProgress" class="loading-progress">
+          <div class="progress-bar">
+            <div 
+              class="progress-fill" 
+              :style="{ width: `${musicStore.scanProgress.total > 0 ? (musicStore.scanProgress.current / musicStore.scanProgress.total * 100) : 0}%` }"
+            ></div>
+          </div>
+          <span class="progress-text">
+            {{ musicStore.scanProgress.current }} / {{ musicStore.scanProgress.total }}
+          </span>
+        </div>
       </div>
     </div>
-  </div>
+  </Transition>
 
-  <div v-else class="app-container">
-    <TitleBar />
-    <div class="main-content">
-      <Sidebar />
-      <main class="content-area">
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
+  <Transition name="app-enter">
+    <div v-if="showContent" class="app-container">
+      <TitleBar />
+      <div class="main-content">
+        <Sidebar />
+        <main class="content-area">
+          <router-view v-slot="{ Component, route }">
+            <Transition :name="route.meta.transition || 'page-slide'" mode="out-in">
+              <component :is="Component" :key="route.path" />
+            </Transition>
+          </router-view>
+        </main>
+      </div>
+      <PlayerBar />
     </div>
-    <PlayerBar />
-  </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -180,13 +188,65 @@ onMounted(async () => {
   padding-bottom: 100px;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+/* Loading fade */
+.loading-fade-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.loading-fade-leave-to {
   opacity: 0;
+  transform: scale(0.95);
+}
+
+/* App enter */
+.app-enter-enter-active {
+  transition: opacity 0.5s ease;
+}
+
+.app-enter-enter-from {
+  opacity: 0;
+}
+
+/* Page slide transition */
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-slide-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+/* Page fade transition */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: all 0.25s ease;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+
+/* Page scale transition */
+.page-scale-enter-active,
+.page-scale-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.page-scale-leave-to {
+  opacity: 0;
+  transform: scale(1.02);
 }
 </style>

@@ -48,18 +48,18 @@ onUnmounted(() => {
 
 <template>
   <div class="settings-view">
-    <h1>设置</h1>
+    <h1 class="animate-fade-in-up">设置</h1>
 
-    <section class="settings-section">
+    <section class="settings-section animate-fade-in-up delay-100">
       <h2>音乐文件夹</h2>
       <p class="section-desc">添加包含音乐文件的文件夹，应用会自动扫描其中的所有音频文件。</p>
       
-      <div class="dir-list">
-        <div v-for="(dir, index) in musicDirs" :key="index" class="dir-item">
+      <TransitionGroup name="list" tag="div" class="dir-list">
+        <div v-for="(dir, index) in musicDirs" :key="dir" class="dir-item">
           <span class="dir-path">{{ dir }}</span>
           <button class="remove-btn" @click="removeDir(index)" :disabled="musicStore.isLoading">移除</button>
         </div>
-      </div>
+      </TransitionGroup>
 
       <div class="add-dir-form">
         <input
@@ -110,13 +110,13 @@ onUnmounted(() => {
       <p class="hint">增量扫描只解析新增或修改的文件，强制重新扫描会解析所有文件</p>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section animate-fade-in-up delay-200">
       <h2>缓存管理</h2>
       <p class="section-desc">清除缓存后下次启动需要重新扫描音乐文件</p>
       <button class="scan-btn secondary" @click="clearCache">清除缓存</button>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section animate-fade-in-up delay-300">
       <h2>关于</h2>
       <p>Melody Player v1.0.0</p>
       <p class="section-desc">一个简洁美观的本地音乐播放器</p>
@@ -134,6 +134,7 @@ onUnmounted(() => {
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 40px;
+  opacity: 0;
 }
 
 .settings-section {
@@ -141,6 +142,7 @@ onUnmounted(() => {
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 24px;
+  opacity: 0;
 }
 
 .settings-section h2 {
@@ -293,5 +295,25 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--text-secondary);
   opacity: 0.7;
+}
+
+/* 列表动画 */
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s ease;
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.list-move {
+  transition: transform 0.3s ease;
 }
 </style>

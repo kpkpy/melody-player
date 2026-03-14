@@ -28,32 +28,36 @@ const createPlaylist = () => {
 <template>
   <aside class="sidebar">
     <nav class="nav-section">
-      <button
-        v-for="item in navItems"
-        :key="item.path"
-        :class="['nav-item', { active: route.path === item.path }]"
-        @click="navigate(item.path)"
-      >
-        <span class="nav-icon">{{ item.icon }}</span>
-        <span class="nav-label">{{ item.label }}</span>
-      </button>
+      <TransitionGroup name="nav-item" tag="div" class="nav-list">
+        <button
+          v-for="(item, index) in navItems"
+          :key="item.path"
+          :class="['nav-item', { active: route.path === item.path }]"
+          :style="{ animationDelay: `${index * 0.05}s` }"
+          @click="navigate(item.path)"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-label">{{ item.label }}</span>
+        </button>
+      </TransitionGroup>
     </nav>
 
     <div class="playlist-section">
-      <div class="section-header">
+      <div class="section-header animate-fade-in-up delay-200">
         <span>歌单</span>
         <button class="add-btn" @click="createPlaylist">+</button>
       </div>
-      <div class="playlist-list">
+      <TransitionGroup name="playlist" tag="div" class="playlist-list">
         <button
-          v-for="playlist in playlistStore.playlists"
+          v-for="(playlist, index) in playlistStore.playlists"
           :key="playlist.id"
           :class="['playlist-item', { active: route.params.id === playlist.id }]"
+          :style="{ animationDelay: `${0.25 + index * 0.05}s` }"
           @click="navigate(`/playlist/${playlist.id}`)"
         >
           {{ playlist.name }}
         </button>
-      </div>
+      </TransitionGroup>
     </div>
   </aside>
 </template>
@@ -69,10 +73,13 @@ const createPlaylist = () => {
 }
 
 .nav-section {
+  margin-bottom: 30px;
+}
+
+.nav-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 30px;
 }
 
 .nav-item {
@@ -83,12 +90,26 @@ const createPlaylist = () => {
   border-radius: 8px;
   font-size: 14px;
   color: var(--text-secondary);
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  animation: fadeInLeft 0.3s ease forwards;
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
@@ -116,6 +137,7 @@ const createPlaylist = () => {
   font-size: 12px;
   text-transform: uppercase;
   color: var(--text-secondary);
+  opacity: 0;
 }
 
 .add-btn {
@@ -127,11 +149,13 @@ const createPlaylist = () => {
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
+  transition: all 0.2s ease;
 }
 
 .add-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+  transform: rotate(90deg);
 }
 
 .playlist-list {
@@ -149,16 +173,39 @@ const createPlaylist = () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  animation: fadeInLeft 0.3s ease forwards;
 }
 
 .playlist-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
+  transform: translateX(4px);
 }
 
 .playlist-item.active {
   background: rgba(233, 69, 96, 0.15);
   color: var(--accent);
+}
+
+/* 动画 */
+.playlist-enter-active,
+.playlist-leave-active {
+  transition: all 0.3s ease;
+}
+
+.playlist-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.playlist-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.playlist-move {
+  transition: transform 0.3s ease;
 }
 </style>

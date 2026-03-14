@@ -28,11 +28,31 @@ defineEmits<{
 <style scoped>
 .song-card {
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .song-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.song-card:active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
 
 .card-cover {
@@ -46,11 +66,21 @@ defineEmits<{
   justify-content: center;
   position: relative;
   overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.song-card:hover .card-cover {
+  transform: scale(1.02);
 }
 
 .cover-placeholder {
   font-size: 40px;
   color: var(--text-secondary);
+  transition: transform 0.3s ease;
+}
+
+.song-card:hover .cover-placeholder {
+  transform: scale(1.1);
 }
 
 .play-overlay {
@@ -61,11 +91,20 @@ defineEmits<{
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.25s ease;
+  backdrop-filter: blur(2px);
 }
 
 .song-card:hover .play-overlay {
   opacity: 1;
+}
+
+.play-overlay svg {
+  transition: transform 0.2s ease;
+}
+
+.song-card:hover .play-overlay svg {
+  transform: scale(1.1);
 }
 
 .card-info {

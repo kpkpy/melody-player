@@ -85,8 +85,8 @@ const formatTime = (seconds: number) => {
 <template>
   <div class="library-view">
     <header class="library-header">
-      <h1>音乐库</h1>
-      <div class="controls">
+      <h1 class="animate-fade-in-up">音乐库</h1>
+      <div class="controls animate-fade-in-up delay-100">
         <input
           v-model="searchQuery"
           type="text"
@@ -117,61 +117,69 @@ const formatTime = (seconds: number) => {
       </div>
     </header>
 
-    <div class="song-list" v-if="viewMode === 'songs'">
-      <div class="list-header">
-        <span class="col-title sortable" @click="toggleSort('title')">
-          标题
-          <span v-if="sortField === 'title'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-        </span>
-        <span class="col-artist sortable" @click="toggleSort('artist')">
-          艺术家
-          <span v-if="sortField === 'artist'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-        </span>
-        <span class="col-album sortable" @click="toggleSort('album')">
-          专辑
-          <span v-if="sortField === 'album'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-        </span>
-        <span class="col-duration sortable" @click="toggleSort('duration')">
-          时长
-          <span v-if="sortField === 'duration'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
-        </span>
-      </div>
-      <div
-        v-for="song in paginatedSongs"
-        :key="song.id"
-        class="song-row"
-        @dblclick="playSong(song)"
-      >
-        <span class="col-title">{{ song.title }}</span>
-        <span class="col-artist">{{ song.artist }}</span>
-        <span class="col-album">{{ song.album }}</span>
-        <span class="col-duration">{{ formatTime(song.duration) }}</span>
-      </div>
-      <div class="pagination" v-if="totalPages > 1">
-        <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">上一页</button>
-        <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
-        <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">下一页</button>
-        <span class="total-info">共 {{ filteredAndSortedSongs.length }} 首</span>
-      </div>
-    </div>
-
-    <div class="album-grid" v-else-if="viewMode === 'albums'">
-      <div v-for="album in musicStore.albums" :key="album.id" class="album-card">
-        <div class="album-cover" :style="{ backgroundImage: album.cover ? `url(${album.cover})` : 'none' }">
-          <div v-if="!album.cover" class="cover-placeholder">♪</div>
+    <Transition name="fade" mode="out-in">
+      <div key="songs" class="song-list animate-fade-in-up delay-200" v-if="viewMode === 'songs'">
+        <div class="list-header">
+          <span class="col-title sortable" @click="toggleSort('title')">
+            标题
+            <span v-if="sortField === 'title'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+          </span>
+          <span class="col-artist sortable" @click="toggleSort('artist')">
+            艺术家
+            <span v-if="sortField === 'artist'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+          </span>
+          <span class="col-album sortable" @click="toggleSort('album')">
+            专辑
+            <span v-if="sortField === 'album'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+          </span>
+          <span class="col-duration sortable" @click="toggleSort('duration')">
+            时长
+            <span v-if="sortField === 'duration'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+          </span>
         </div>
-        <div class="album-name">{{ album.name }}</div>
-        <div class="album-artist">{{ album.artist }}</div>
+        <TransitionGroup name="song-list" tag="div">
+          <div
+            v-for="song in paginatedSongs"
+            :key="song.id"
+            class="song-row"
+            @dblclick="playSong(song)"
+          >
+            <span class="col-title">{{ song.title }}</span>
+            <span class="col-artist">{{ song.artist }}</span>
+            <span class="col-album">{{ song.album }}</span>
+            <span class="col-duration">{{ formatTime(song.duration) }}</span>
+          </div>
+        </TransitionGroup>
+        <div class="pagination" v-if="totalPages > 1">
+          <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">上一页</button>
+          <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">下一页</button>
+          <span class="total-info">共 {{ filteredAndSortedSongs.length }} 首</span>
+        </div>
       </div>
-    </div>
 
-    <div class="artist-grid" v-else-if="viewMode === 'artists'">
-      <div v-for="artist in musicStore.artists" :key="artist.id" class="artist-card">
-        <div class="artist-avatar">{{ artist.name.charAt(0) }}</div>
-        <div class="artist-name">{{ artist.name }}</div>
-        <div class="artist-count">{{ artist.songs.length }} 首歌曲</div>
+      <div key="albums" class="album-grid animate-fade-in-up delay-200" v-else-if="viewMode === 'albums'">
+        <TransitionGroup name="card-grid">
+          <div v-for="(album, index) in musicStore.albums" :key="album.id" class="album-card card-hover" :style="{ animationDelay: `${index * 0.05}s` }">
+            <div class="album-cover" :style="{ backgroundImage: album.cover ? `url(${album.cover})` : 'none' }">
+              <div v-if="!album.cover" class="cover-placeholder">♪</div>
+            </div>
+            <div class="album-name">{{ album.name }}</div>
+            <div class="album-artist">{{ album.artist }}</div>
+          </div>
+        </TransitionGroup>
       </div>
-    </div>
+
+      <div key="artists" class="artist-grid animate-fade-in-up delay-200" v-else-if="viewMode === 'artists'">
+        <TransitionGroup name="card-grid">
+          <div v-for="(artist, index) in musicStore.artists" :key="artist.id" class="artist-card card-hover" :style="{ animationDelay: `${index * 0.05}s` }">
+            <div class="artist-avatar">{{ artist.name.charAt(0) }}</div>
+            <div class="artist-name">{{ artist.name }}</div>
+            <div class="artist-count">{{ artist.songs.length }} 首歌曲</div>
+          </div>
+        </TransitionGroup>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -189,12 +197,14 @@ const formatTime = (seconds: number) => {
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 20px;
+  opacity: 0;
 }
 
 .controls {
   display: flex;
   gap: 20px;
   align-items: center;
+  opacity: 0;
 }
 
 .search-input {
@@ -371,5 +381,41 @@ const formatTime = (seconds: number) => {
 .artist-count {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* 歌曲列表动画 */
+.song-list-enter-active,
+.song-list-leave-active {
+  transition: all 0.3s ease;
+}
+
+.song-list-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.song-list-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+/* 卡片网格动画 */
+.card-grid-enter-active,
+.card-grid-leave-active {
+  transition: all 0.4s ease;
+}
+
+.card-grid-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.card-grid-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.card-grid-move {
+  transition: transform 0.4s ease;
 }
 </style>
