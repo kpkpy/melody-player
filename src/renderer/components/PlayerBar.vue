@@ -97,12 +97,17 @@ const drawVisualizer = () => {
   vuRight.value = Math.min(1, avg * 1.3 + Math.random() * 0.08)
   
   const dpr = window.devicePixelRatio || 1
-  canvas.width = canvas.offsetWidth * dpr
-  canvas.height = canvas.offsetHeight * dpr
+  const displayWidth = canvas.offsetWidth || 400
+  const displayHeight = canvas.offsetHeight || 200
+  
+  canvas.width = displayWidth * dpr
+  canvas.height = displayHeight * dpr
   ctx.scale(dpr, dpr)
   
-  const width = canvas.offsetWidth
-  const height = canvas.offsetHeight
+  const width = displayWidth
+  const height = displayHeight
+  
+  if (width === 0 || height === 0) return
   
   ctx.clearRect(0, 0, width, height)
   
@@ -646,7 +651,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 80px 40px 100px;
+  padding: 100px 40px 20px;
+  overflow: hidden;
 }
 
 /* 封面页 */
@@ -792,10 +798,12 @@ onUnmounted(() => {
 /* 可视化页 */
 .visualizer-tab {
   width: 100%;
+  max-width: 800px;
   height: 100%;
+  max-height: 400px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .visualizer-header {
@@ -843,10 +851,11 @@ onUnmounted(() => {
 
 .visualizer-canvas-container {
   flex: 1;
+  min-height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
   border-radius: 16px;
   padding: 20px;
   box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
@@ -855,7 +864,7 @@ onUnmounted(() => {
 .visualizer-canvas {
   width: 100%;
   height: 100%;
-  max-height: 300px;
+  min-height: 200px;
 }
 
 /* 底部控制 */
@@ -1033,13 +1042,20 @@ onUnmounted(() => {
 }
 
 .ctrl-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-secondary);
+  border-radius: 50%;
   transition: all 0.15s ease;
 }
 
 .ctrl-btn:hover {
   color: var(--accent);
   transform: scale(1.1);
+  background: rgba(233, 69, 96, 0.1);
 }
 
 .play-btn {
