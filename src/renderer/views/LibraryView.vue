@@ -9,21 +9,77 @@ const playerStore = usePlayerStore()
 const searchQuery = ref('')
 const viewMode = ref<'songs' | 'albums' | 'artists'>('songs')
 
-const filteredSongs = computed(() => {
-  if (!searchQuery.value) return musicStore.songs
-  const query = searchQuery.value.toLowerCase()
-  return musicStore.songs.filter(
-    song =>
-      song.title.toLowerCase().includes(query) ||
-      song.artist.toLowerCase().includes(query) ||
-      song.album.toLowerCase().includes(query)
-  )
+const sortField = ref<'title' | 'artist' | 'album' | 'duration'>('title')
+const sortOrder = ref<'asc' | 'desc'>('asc')
+const pageSize = ref(50)
+const currentPage = ref(1)
+
+const resetPage = () => {
+  currentPage.value = 1
+}
+
+const toggleSort = (field: 'title' | 'artist' | 'album' | 'duration') => {
+  if (sortField.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortOrder.value = 'asc'
+  }
+  currentPage.value = 1
+}
+
+const filteredAndSortedSongs = computed(() => {
+  let songs = musicStore.songs
+  
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    songs = songs.filter(
+      song =>
+        song.title.toLowerCase().includes(query) ||
+        song.artist.toLowerCase().includes(query) ||
+        song.album.toLowerCase().includes(query)
+    )
+  }
+  
+  const sorted = [...songs].sort((a, b) => {
+    let aVal = a[sortField.value]
+    let bVal = b[sortField.value]
+    
+    if (typeof aVal === 'string') aVal = aVal.toLowerCase()
+    if (typeof bVal === 'string') bVal = bVal.toLowerCase()
+    
+    if (aVal < bVal) return sortOrder.value === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortOrder.value === 'asc' ? 1 : -1
+    return 0
+  })
+  
+  return sorted
 })
 
+const totalPages = computed(() => {
+  return Math.ceil(filteredAndSortedSongs.value.length / pageSize.value)
+})
+
+const paginatedSongs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredAndSortedSongs.value.slice(start, end)
+})
+
+const goToPage = (page: number) => {
+  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
+}
+
 const playSong = (song: any) => {
-    const index = filteredSongs.value.findIndex(s => s.id === song.id)
-    playerStore.setPlaylist(filteredSongs.value, index >= 0 ? index : 0)
-  }
+  const index = filteredAndSortedSongs.value.findIndex(s => s.id === song.id)
+  playerStore.setPlaylist(filteredAndSortedSongs.value, index >= 0 ? index : 0)
+}
+
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 </script>
 
 <template>
@@ -36,6 +92,7 @@ const playSong = (song: any) => {
           type="text"
           placeholder="搜索歌曲、艺术家、专辑..."
           class="search-input"
+          @input="resetPage"
         />
         <div class="view-tabs">
           <button
@@ -62,13 +119,25 @@ const playSong = (song: any) => {
 
     <div class="song-list" v-if="viewMode === 'songs'">
       <div class="list-header">
-        <span class="col-title">标题</span>
-        <span class="col-artist">艺术家</span>
-        <span class="col-album">专辑</span>
-        <span class="col-duration">时长</span>
+        <span class="col-title sortable" @click="toggleSort('title')">
+          标题
+          <span v-if="sortField === 'title'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+        </span>
+        <span class="col-artist sortable" @click="toggleSort('artist')">
+          艺术家
+          <span v-if="sortField === 'artist'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+        </span>
+        <span class="col-album sortable" @click="toggleSort('album')">
+          专辑
+          <span v-if="sortField === 'album'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+        </span>
+        <span class="col-duration sortable" @click="toggleSort('duration')">
+          时长
+          <span v-if="sortField === 'duration'" class="sort-icon">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+        </span>
       </div>
       <div
-        v-for="song in filteredSongs"
+        v-for="song in paginatedSongs"
         :key="song.id"
         class="song-row"
         @dblclick="playSong(song)"
@@ -76,7 +145,13 @@ const playSong = (song: any) => {
         <span class="col-title">{{ song.title }}</span>
         <span class="col-artist">{{ song.artist }}</span>
         <span class="col-album">{{ song.album }}</span>
-        <span class="col-duration">{{ Math.floor(song.duration / 60) }}:{{ String(song.duration % 60).padStart(2, '0') }}</span>
+        <span class="col-duration">{{ formatTime(song.duration) }}</span>
+      </div>
+      <div class="pagination" v-if="totalPages > 1">
+        <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">上一页</button>
+        <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+        <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">下一页</button>
+        <span class="total-info">共 {{ filteredAndSortedSongs.length }} 首</span>
       </div>
     </div>
 
@@ -176,6 +251,20 @@ const playSong = (song: any) => {
   border-bottom: 1px solid var(--border);
 }
 
+.list-header .sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.list-header .sortable:hover {
+  color: var(--text-primary);
+}
+
+.sort-icon {
+  margin-left: 4px;
+}
+
 .song-row {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 80px;
@@ -197,6 +286,42 @@ const playSong = (song: any) => {
 .col-duration {
   color: var(--text-secondary);
   text-align: right;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.page-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.total-info {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .album-grid,
