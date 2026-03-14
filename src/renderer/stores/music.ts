@@ -14,7 +14,7 @@ export interface Song {
 }
 
 export interface ScanProgress {
-  phase: 'scanning' | 'parsing'
+  phase: 'scanning' | 'parsing' | 'loading'
   current: number
   total: number
   currentFile?: string
@@ -43,13 +43,13 @@ export const useMusicStore = defineStore('music', () => {
     }
   }
 
-  const scanLibrary = async (paths: string[]) => {
+  const scanLibrary = async (paths: string[], forceRescan: boolean = false) => {
     isLoading.value = true
     scanProgress.value = { phase: 'scanning', current: 0, total: 0 }
     
     try {
       const plainPaths = JSON.parse(JSON.stringify(paths))
-      await window.electron.library.scan(plainPaths)
+      await window.electron.library.scan(plainPaths, forceRescan)
       await loadLibrary()
     } finally {
       isLoading.value = false

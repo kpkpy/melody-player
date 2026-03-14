@@ -23,10 +23,14 @@ const removeDir = async (index: number) => {
   await window.electron.config.setMusicDirs(toRaw(musicDirs.value))
 }
 
-const scanAll = async () => {
+const scanAll = async (forceRescan: boolean = false) => {
   if (musicDirs.value.length === 0) return
-  const paths = [...musicDirs.value]
-  await musicStore.scanLibrary(paths)
+  const paths = toRaw(musicDirs.value)
+  await musicStore.scanLibrary(paths, forceRescan)
+}
+
+const clearCache = async () => {
+  await window.electron.library.clearCache()
 }
 
 let removeListener: (() => void) | null = null
@@ -70,7 +74,10 @@ onUnmounted(() => {
 
       <div v-if="musicStore.scanProgress" class="progress-section">
         <div class="progress-info">
-          <span>{{ musicStore.scanProgress.phase === 'scanning' ? '扫描中...' : '解析中...' }}</span>
+          <span>{{
+            musicStore.scanProgress.phase === 'scanning' ? '扫描中...' :
+            musicStore.scanProgress.phase === 'parsing' ? '解析中...' : '加载缓存...'
+          }}</span>
           <span>{{ musicStore.scanProgress.current }} / {{ musicStore.scanProgress.total }}</span>
         </div>
         <div class="progress-bar">
@@ -84,13 +91,29 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <button
-        class="scan-btn"
-        @click="scanAll"
-        :disabled="musicStore.isLoading || musicDirs.length === 0"
-      >
-        {{ musicStore.isLoading ? '扫描中...' : '扫描音乐库' }}
-      </button>
+      <div class="btn-group">
+        <button
+          class="scan-btn"
+          @click="scanAll(false)"
+          :disabled="musicStore.isLoading || musicDirs.length === 0"
+        >
+          {{ musicStore.isLoading ? '处理中...' : '增量扫描' }}
+        </button>
+        <button
+          class="scan-btn secondary"
+          @click="scanAll(true)"
+          :disabled="musicStore.isLoading || musicDirs.length === 0"
+        >
+          强制重新扫描
+        </button>
+      </div>
+      <p class="hint">增量扫描只解析新增或修改的文件，强制重新扫描会解析所有文件</p>
+    </section>
+
+    <section class="settings-section">
+      <h2>缓存管理</h2>
+      <p class="section-desc">清除缓存后下次启动需要重新扫描音乐文件</p>
+      <button class="scan-btn secondary" @click="clearCache">清除缓存</button>
     </section>
 
     <section class="settings-section">
@@ -232,8 +255,7 @@ onUnmounted(() => {
 }
 
 .scan-btn {
-  width: 100%;
-  padding: 14px;
+  padding: 14px 24px;
   background: var(--accent);
   border-radius: 8px;
   font-size: 14px;
@@ -247,5 +269,29 @@ onUnmounted(() => {
 .scan-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.scan-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scan-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-group {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.btn-group .scan-btn {
+  flex: 1;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.7;
 }
 </style>

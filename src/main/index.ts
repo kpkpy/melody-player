@@ -48,10 +48,13 @@ ipcMain.handle('app:ready', async () => {
   autoScanned = true
   
   const savedDirs = configManager.getMusicDirs()
-  if (savedDirs.length > 0) {
+  if (savedDirs.length === 0) return
+
+  const loaded = await musicLibrary.loadFromCache()
+  if (!loaded) {
     await musicLibrary.scan(savedDirs)
-    playlistManager.setSongs(musicLibrary.getSongs())
   }
+  playlistManager.setSongs(musicLibrary.getSongs())
 })
 
 app.whenReady().then(() => {
@@ -80,10 +83,15 @@ app.on('activate', () => {
 })
 
 // 音乐库相关
-ipcMain.handle('library:scan', async (_, paths: string[]) => {
-  const result = await musicLibrary.scan(paths)
+ipcMain.handle('library:scan', async (_, paths: string[], forceRescan: boolean = false) => {
+  const result = await musicLibrary.scan(paths, forceRescan)
   playlistManager.setSongs(musicLibrary.getSongs())
   return result
+})
+
+ipcMain.handle('library:clearCache', async () => {
+  musicLibrary.clearCache()
+  return true
 })
 
 ipcMain.handle('library:getSongs', async () => {

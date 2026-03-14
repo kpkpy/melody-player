@@ -1,7 +1,8 @@
-import { readdir } from 'fs/promises'
+import { readdir, stat } from 'fs/promises'
 import { parseFile } from 'music-metadata'
 import { join, extname } from 'path'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 
 const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.m4a', '.wav', '.ogg', '.wma', '.ape', '.aac']
 
@@ -15,6 +16,7 @@ export interface Song {
   audioUrl: string
   cover?: string
   lyrics?: string
+  mtime?: number
 }
 
 export interface Album {
@@ -33,17 +35,30 @@ export interface Artist {
 }
 
 export interface ScanProgress {
-  phase: 'scanning' | 'parsing'
+  phase: 'scanning' | 'parsing' | 'loading'
   current: number
   total: number
   currentFile?: string
 }
+
+interface LibraryCache {
+  version: number
+  songs: Song[]
+  lastScan: number
+}
+
+const CACHE_VERSION = 1
 
 export class MusicLibrary {
   private songs: Map<string, Song> = new Map()
   private albums: Map<string, Album> = new Map()
   private artists: Map<string, Artist> = new Map()
   private win: BrowserWindow | null = null
+  private cachePath: string
+
+  constructor() {
+    this.cachePath = join(app.getPath('userData'), 'library-cache.json')
+  }
 
   setWindow(win: BrowserWindow) {
     this.win = win
@@ -60,18 +75,77 @@ export class MusicLibrary {
     }
   }
 
-  async scan(paths: string[]): Promise<{ count: number; errors: string[] }> {
+  private loadCache(): Song[] | null {
+    try {
+      if (existsSync(this.cachePath)) {
+        const data = readFileSync(this.cachePath, 'utf-8')
+        const cache: LibraryCache = JSON.parse(data)
+        if (cache.version === CACHE_VERSION && cache.songs) {
+          return cache.songs
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load cache:', e)
+    }
+    return null
+  }
+
+  private saveCache(): void {
+    try {
+      const cache: LibraryCache = {
+        version: CACHE_VERSION,
+        songs: this.getSongs(),
+        lastScan: Date.now()
+      }
+      writeFileSync(this.cachePath, JSON.stringify(cache))
+    } catch (e) {
+      console.error('Failed to save cache:', e)
+    }
+  }
+
+  async loadFromCache(): Promise<boolean> {
+    const cachedSongs = this.loadCache()
+    if (!cachedSongs || cachedSongs.length === 0) {
+      return false
+    }
+
+    this.notifyProgress('loading', 0, cachedSongs.length, '加载缓存...')
+    
+    for (let i = 0; i < cachedSongs.length; i++) {
+      const song = cachedSongs[i]
+      this.songs.set(song.id, song)
+      this.addToAlbum(song)
+      this.addToArtist(song)
+      
+      if (i % 100 === 0) {
+        this.notifyProgress('loading', i, cachedSongs.length, '加载缓存...')
+      }
+    }
+
+    this.notifyProgress('loading', cachedSongs.length, cachedSongs.length, '加载完成')
+    return true
+  }
+
+  async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: number; errors: string[] }> {
     this.songs.clear()
     this.albums.clear()
     this.artists.clear()
+
+    const cachedSongs = forceRescan ? null : this.loadCache()
+    const cachedMap = new Map<string, Song>()
+    if (cachedSongs) {
+      for (const song of cachedSongs) {
+        cachedMap.set(song.filePath, song)
+      }
+    }
     
     const errors: string[] = []
     const allFiles: string[] = []
+    const fileStats = new Map<string, number>()
 
     for (const basePath of paths) {
       try {
-        const files = await this.scanDirectory(basePath)
-        allFiles.push(...files)
+        await this.scanDirectory(basePath, allFiles, fileStats)
       } catch (e: any) {
         errors.push(`Failed to scan ${basePath}: ${e.message || e}`)
       }
@@ -86,28 +160,36 @@ export class MusicLibrary {
     for (let i = 0; i < allFiles.length; i += batchSize) {
       const batch = allFiles.slice(i, i + batchSize)
       
-      for (const filePath of batch) {
-        try {
-          const metadata = await parseFile(filePath)
-          const song = this.createSong(filePath, metadata)
-          this.songs.set(song.id, song)
-          this.addToAlbum(song)
-          this.addToArtist(song)
-        } catch (e) {
-          // 忽略解析错误
+      await Promise.all(batch.map(async (filePath) => {
+        const mtime = fileStats.get(filePath) || 0
+        const cached = cachedMap.get(filePath)
+        
+        if (cached && cached.mtime && cached.mtime >= mtime) {
+          this.songs.set(cached.id, cached)
+          this.addToAlbum(cached)
+          this.addToArtist(cached)
+        } else {
+          try {
+            const metadata = await parseFile(filePath)
+            const song = this.createSong(filePath, metadata, mtime)
+            this.songs.set(song.id, song)
+            this.addToAlbum(song)
+            this.addToArtist(song)
+          } catch (e) {
+            // 忽略解析错误
+          }
         }
-      }
+      }))
       
       processed += batch.length
       this.notifyProgress('parsing', processed, total, batch[batch.length - 1])
     }
 
+    this.saveCache()
     return { count: allFiles.length, errors }
   }
 
-  private async scanDirectory(basePath: string): Promise<string[]> {
-    const files: string[] = []
-    
+  private async scanDirectory(basePath: string, files: string[], fileStats: Map<string, number>): Promise<void> {
     const scan = async (dir: string) => {
       try {
         const entries = await readdir(dir, { withFileTypes: true })
@@ -121,6 +203,12 @@ export class MusicLibrary {
             const ext = extname(entry.name).toLowerCase()
             if (AUDIO_EXTENSIONS.includes(ext)) {
               files.push(fullPath)
+              try {
+                const stats = await stat(fullPath)
+                fileStats.set(fullPath, stats.mtimeMs)
+              } catch (e) {
+                // 忽略
+              }
             }
           }
         }
@@ -130,10 +218,9 @@ export class MusicLibrary {
     }
     
     await scan(basePath)
-    return files
   }
 
-  private createSong(filePath: string, metadata: any): Song {
+  private createSong(filePath: string, metadata: any, mtime: number): Song {
     const id = Buffer.from(filePath).toString('base64')
     const common = metadata.common
     
@@ -167,6 +254,7 @@ export class MusicLibrary {
       audioUrl: `audio://${filePath}`,
       cover,
       lyrics,
+      mtime,
     }
   }
 
@@ -214,6 +302,7 @@ export class MusicLibrary {
       audioUrl: song.audioUrl,
       cover: song.cover,
       lyrics: song.lyrics,
+      mtime: song.mtime,
     }))
   }
 
@@ -278,5 +367,16 @@ export class MusicLibrary {
     }
 
     return undefined
+  }
+
+  clearCache(): void {
+    try {
+      if (existsSync(this.cachePath)) {
+        const { unlinkSync } = require('fs')
+        unlinkSync(this.cachePath)
+      }
+    } catch (e) {
+      console.error('Failed to clear cache:', e)
+    }
   }
 }

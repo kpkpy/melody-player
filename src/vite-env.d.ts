@@ -11,10 +11,11 @@ interface ElectronAPI {
     ready: () => Promise<void>
   }
   library: {
-    scan: (paths: string[]) => Promise<{ count: number; errors: string[] }>
+    scan: (paths: string[], forceRescan?: boolean) => Promise<{ count: number; errors: string[] }>
     getSongs: () => Promise<any[]>
     getAlbums: () => Promise<any[]>
     getArtists: () => Promise<any[]>
+    clearCache: () => Promise<boolean>
     onScanProgress: (callback: (progress: { phase: string; current: number; total: number; currentFile: string }) => void) => (() => void)
   }
   player: {

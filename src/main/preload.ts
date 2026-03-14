@@ -6,10 +6,11 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   library: {
-    scan: (paths: string[]) => ipcRenderer.invoke('library:scan', paths),
+    scan: (paths: string[], forceRescan?: boolean) => ipcRenderer.invoke('library:scan', paths, forceRescan),
     getSongs: () => ipcRenderer.invoke('library:getSongs'),
     getAlbums: () => ipcRenderer.invoke('library:getAlbums'),
     getArtists: () => ipcRenderer.invoke('library:getArtists'),
+    clearCache: () => ipcRenderer.invoke('library:clearCache'),
     onScanProgress: (callback: (progress: { phase: string; current: number; total: number; currentFile: string }) => void) => {
       const handler = (_event: IpcRendererEvent, progress: { phase: string; current: number; total: number; currentFile: string }) => {
         callback(progress)
