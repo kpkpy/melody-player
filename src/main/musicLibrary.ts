@@ -270,10 +270,15 @@ export class MusicLibrary {
         id: albumId,
         name: song.album,
         artist: song.artist,
+        cover: song.cover,
         songs: [],
       })
     }
-    this.albums.get(albumId)!.songs.push(song)
+    const album = this.albums.get(albumId)!
+    if (!album.cover && song.cover) {
+      album.cover = song.cover
+    }
+    album.songs.push(song)
   }
 
   private addToArtist(song: Song): void {
@@ -306,42 +311,47 @@ export class MusicLibrary {
     }))
   }
 
-  getAlbums(): Album[] {
-    return Array.from(this.albums.values()).map(album => ({
-      id: album.id,
-      name: album.name,
-      artist: album.artist,
-      songs: album.songs.map(s => ({
-        id: s.id,
-        title: s.title,
-        artist: s.artist,
-        album: s.album,
-        duration: s.duration,
-        filePath: s.filePath,
-        audioUrl: s.audioUrl,
-        cover: s.cover,
-        lyrics: s.lyrics,
-      })),
-    }))
+  getAlbums(): any[] {
+    return Array.from(this.albums.values()).map(album => {
+      const sortedSongs = [...album.songs].sort((a, b) => 
+        a.filePath.localeCompare(b.filePath)
+      )
+      const cover = sortedSongs.find(s => s.cover)?.cover
+      return {
+        id: album.id,
+        name: album.name,
+        artist: album.artist,
+        cover,
+        songCount: album.songs.length,
+        songIds: album.songs.map(s => s.id),
+      }
+    })
   }
 
-  getArtists(): Artist[] {
+  getArtists(): any[] {
     return Array.from(this.artists.values()).map(artist => ({
       id: artist.id,
       name: artist.name,
-      albums: artist.albums,
-      songs: artist.songs.map(s => ({
-        id: s.id,
-        title: s.title,
-        artist: s.artist,
-        album: s.album,
-        duration: s.duration,
-        filePath: s.filePath,
-        audioUrl: s.audioUrl,
-        cover: s.cover,
-        lyrics: s.lyrics,
-      })),
+      songCount: artist.songs.length,
+      songIds: artist.songs.map(s => s.id),
     }))
+  }
+
+  getSongsByIds(ids: string[]): Song[] {
+    return ids
+      .map(id => this.songs.get(id))
+      .filter((s): s is Song => s !== undefined)
+      .map(song => ({
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        duration: song.duration,
+        filePath: song.filePath,
+        audioUrl: song.audioUrl,
+        cover: song.cover,
+        lyrics: song.lyrics,
+      }))
   }
 
   getSongById(id: string): Song | undefined {

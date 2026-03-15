@@ -18,6 +18,14 @@ const progress = computed(() => {
   return (playerStore.currentTime / playerStore.duration) * 100
 })
 
+const playModeTitle = computed(() => {
+  switch (playerStore.playMode) {
+    case 'random': return '随机播放'
+    case 'single': return '单曲循环'
+    default: return '顺序播放'
+  }
+})
+
 const seek = (e: MouseEvent) => {
   const target = e.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
@@ -710,6 +718,24 @@ onUnmounted(() => {
       </div>
 
       <div class="extra-controls">
+        <button class="queue-btn" :class="{ active: playerStore.queue.length > 0 }" @click="playerStore.showQueue = !playerStore.showQueue" title="播放队列">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+          </svg>
+          <span v-if="playerStore.queue.length > 0" class="queue-badge">{{ playerStore.queue.length }}</span>
+        </button>
+        <button class="mode-btn" :class="{ active: playerStore.playMode !== 'sequence' }" @click="playerStore.togglePlayMode" :title="playModeTitle">
+          <svg v-if="playerStore.playMode === 'sequence'" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+          </svg>
+          <svg v-else-if="playerStore.playMode === 'random'" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+            <text x="12" y="14" font-size="8" text-anchor="middle" fill="currentColor">1</text>
+          </svg>
+        </button>
         <div class="volume-control">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
@@ -720,6 +746,39 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <Transition name="queue-panel">
+      <div v-if="playerStore.showQueue" class="queue-panel">
+        <div class="queue-header">
+          <h3>播放队列 ({{ playerStore.queue.length }})</h3>
+          <button v-if="playerStore.queue.length > 0" class="clear-btn" @click="playerStore.clearQueue">清空</button>
+        </div>
+        <div class="queue-content">
+          <div v-if="playerStore.queue.length === 0" class="queue-empty">
+            <p>队列为空</p>
+            <p class="hint">从音乐库添加歌曲到队列</p>
+          </div>
+          <div v-else class="queue-list">
+            <div 
+              v-for="(song, index) in playerStore.queue" 
+              :key="song.id" 
+              class="queue-item" 
+              @click="playerStore.playFromQueue(index)"
+            >
+              <div class="queue-item-info">
+                <div class="queue-item-title">{{ song.title }}</div>
+                <div class="queue-item-artist">{{ song.artist }}</div>
+              </div>
+              <button class="queue-remove-btn" @click.stop="playerStore.removeFromQueue(index)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1369,5 +1428,180 @@ onUnmounted(() => {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-color-1, var(--accent)), var(--accent-color-2, var(--accent-hover)));
   border-radius: 2px;
+}
+
+.queue-btn,
+.mode-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+  margin-right: 8px;
+}
+
+.queue-btn:hover,
+.mode-btn:hover {
+  color: var(--accent-color-1, var(--accent));
+  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.1));
+}
+
+.queue-btn.active,
+.mode-btn.active {
+  color: var(--accent-color-1, var(--accent));
+}
+
+.queue-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: var(--accent);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-panel {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  width: 320px;
+  max-height: 400px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.clear-btn {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.clear-btn:hover {
+  color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.queue-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.queue-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.queue-empty .hint {
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.queue-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-artist {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-remove-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 50%;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.queue-item:hover .queue-remove-btn {
+  opacity: 1;
+}
+
+.queue-remove-btn:hover {
+  color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.queue-panel-enter-active,
+.queue-panel-leave-active {
+  transition: all 0.25s ease;
+}
+
+.queue-panel-enter-from,
+.queue-panel-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>
