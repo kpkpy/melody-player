@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 export type PlayMode = 'sequence' | 'random' | 'single'
 
@@ -17,8 +17,51 @@ export const usePlayerStore = defineStore('player', () => {
   const playMode = ref<PlayMode>('sequence')
   const shuffledIndices = ref<number[]>([])
   const showQueue = ref(false)
+  const lyrics = ref<string[]>([])
+  
+  // 统计相关
+  let playStartTime: number = 0
   
   let audio: HTMLAudioElement | null = null
+  
+  // 全局热键监听卸载函数
+  let cleanupHotkeys: (() => void)[] = []
+
+  // 设置全局热键监听
+  const setupGlobalHotkeys = () => {
+    // 清理旧的监听器
+    cleanupHotkeys.forEach(cleanup => cleanup())
+    cleanupHotkeys = []
+    
+    // 注册热键监听
+    if ((window as any).electron?.onGlobalHotkey) {
+      cleanupHotkeys.push(
+        window.electron.onGlobalHotkey('playPause', () => {
+          togglePlay()
+        })
+      )
+      cleanupHotkeys.push(
+        window.electron.onGlobalHotkey('next', () => {
+          playNext()
+        })
+      )
+      cleanupHotkeys.push(
+        window.electron.onGlobalHotkey('previous', () => {
+          previous()
+        })
+      )
+      cleanupHotkeys.push(
+        window.electron.onGlobalHotkey('volumeUp', () => {
+          setVolume(Math.min(1, volume.value + 0.1))
+        })
+      )
+      cleanupHotkeys.push(
+        window.electron.onGlobalHotkey('volumeDown', () => {
+          setVolume(Math.max(0, volume.value - 0.1))
+        })
+      )
+    }
+  }
 
   const queue = computed(() => {
     if (playlist.value.length === 0) return []
@@ -56,16 +99,22 @@ export const usePlayerStore = defineStore('player', () => {
         duration.value = audio?.duration || 0
       })
       
-      audio.addEventListener('ended', () => {
-        isPlaying.value = false
-        if (playMode.value === 'single') {
-          audio!.currentTime = 0
-          audio!.play()
-          isPlaying.value = true
-        } else {
-          playNext()
-        }
-      })
+  audio.addEventListener('ended', () => {
+    isPlaying.value = false
+    
+    // 统计：完成播放
+    if ((window as any).electron?.stats) {
+      window.electron.stats.stopPlaying(true)
+    }
+    
+    if (playMode.value === 'single') {
+      audio!.currentTime = 0
+      audio!.play()
+      isPlaying.value = true
+    } else {
+      playNext()
+    }
+  })
       
       audio.addEventListener('play', () => {
         isPlaying.value = true
@@ -132,6 +181,18 @@ export const usePlayerStore = defineStore('player', () => {
       a.src = song.audioUrl
       try {
         await a.play()
+        
+        // 开始统计
+        playStartTime = Date.now()
+        if ((window as any).electron?.stats) {
+          window.electron.stats.startPlaying(song)
+        }
+        
+        // 更新桌面歌词
+        if ((window as any).electron?.desktopLyrics) {
+          // 简单显示标题和艺术家
+          window.electron.desktopLyrics.update([song.artist, song.title], 0)
+        }
       } catch (e) {
         console.error('Play error:', e)
       }
@@ -202,10 +263,21 @@ export const usePlayerStore = defineStore('player', () => {
 
   const pause = () => {
     audio?.pause()
+    
+    // 停止统计（未完成）
+    if ((window as any).electron?.stats) {
+      window.electron.stats.stopPlaying(false)
+    }
   }
 
   const resume = () => {
     audio?.play()
+    
+    // 重新开始统计
+    playStartTime = Date.now()
+    if ((window as any).electron?.stats && currentSong.value) {
+      window.electron.stats.startPlaying(currentSong.value)
+    }
   }
 
   const stop = () => {
@@ -213,6 +285,11 @@ export const usePlayerStore = defineStore('player', () => {
       audio.pause()
       audio.currentTime = 0
       isPlaying.value = false
+      
+      // 停止统计
+      if ((window as any).electron?.stats) {
+        window.electron.stats.stopPlaying(false)
+      }
     }
   }
 
@@ -305,6 +382,7 @@ export const usePlayerStore = defineStore('player', () => {
     queue,
     queueCount,
     showQueue,
+    lyrics,
     play,
     pause,
     resume,
@@ -322,5 +400,6 @@ export const usePlayerStore = defineStore('player', () => {
     clearQueue,
     playFromQueue,
     getAudio: () => audio,
+    setupGlobalHotkeys,
   }
 })

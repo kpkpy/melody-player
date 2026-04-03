@@ -86,6 +86,19 @@ contextBridge.exposeInMainWorld('electron', {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
+    toggleMini: () => ipcRenderer.invoke('window:toggleMini'),
+    isMini: () => ipcRenderer.invoke('window:isMini'),
+    togglePiP: () => ipcRenderer.invoke('window:togglePiP'),
+    onMiniModeChanged: (callback: (isMini: boolean) => void) => {
+      const handler = (_event: any, isMini: boolean) => callback(isMini)
+      ipcRenderer.on('window:miniModeChanged', handler)
+      return () => ipcRenderer.removeListener('window:miniModeChanged', handler)
+    },
+    onPiPModeChanged: (callback: (isPiP: boolean) => void) => {
+      const handler = (_event: any, isPiP: boolean) => callback(isPiP)
+      ipcRenderer.on('window:PiPModeChanged', handler)
+      return () => ipcRenderer.removeListener('window:PiPModeChanged', handler)
+    },
   },
 
   config: {
@@ -93,5 +106,43 @@ contextBridge.exposeInMainWorld('electron', {
     setMusicDirs: (dirs: string[]) => ipcRenderer.invoke('config:setMusicDirs', dirs),
     addMusicDir: (dir: string) => ipcRenderer.invoke('config:addMusicDir', dir),
     removeMusicDir: (dir: string) => ipcRenderer.invoke('config:removeMusicDir', dir),
+  },
+
+  // Phase 1: 交互增强
+  desktopLyrics: {
+    show: () => ipcRenderer.invoke('desktopLyrics:show'),
+    hide: () => ipcRenderer.invoke('desktopLyrics:hide'),
+    toggle: () => ipcRenderer.invoke('desktopLyrics:toggle'),
+    update: (lines: string[], currentIndex: number) => ipcRenderer.invoke('desktopLyrics:update', lines, currentIndex),
+  },
+
+  stats: {
+    startPlaying: (song: any) => ipcRenderer.invoke('stats:startPlaying', song),
+    stopPlaying: (completed: boolean) => ipcRenderer.invoke('stats:stopPlaying', completed),
+    getStats: () => ipcRenderer.invoke('stats:getStats'),
+    getTopSongs: (limit: number) => ipcRenderer.invoke('stats:getTopSongs', limit),
+    getTopArtists: (limit: number) => ipcRenderer.invoke('stats:getTopArtists', limit),
+    getRecentlyPlayed: (limit: number) => ipcRenderer.invoke('stats:getRecentlyPlayed', limit),
+    getDailyStats: () => ipcRenderer.invoke('stats:getDailyStats'),
+    toggleFavorite: (songId: string) => ipcRenderer.invoke('stats:toggleFavorite', songId),
+    addEmotionTag: (songId: string, tag: string) => ipcRenderer.invoke('stats:addEmotionTag', songId, tag),
+    removeEmotionTag: (songId: string, tag: string) => ipcRenderer.invoke('stats:removeEmotionTag', songId, tag),
+    clearStats: () => ipcRenderer.invoke('stats:clearStats'),
+    getRecommendations: (songId: string, limit: number) => ipcRenderer.invoke('stats:getRecommendations', songId, limit),
+    getSmartPlaylist: (scene: 'focus' | 'workout' | 'relax' | 'party') => ipcRenderer.invoke('stats:getSmartPlaylist', scene),
+    getFavorites: () => ipcRenderer.invoke('stats:getFavorites'),
+    // 情绪分类
+    getEmotionCategories: () => ipcRenderer.invoke('stats:getEmotionCategories'),
+    getSongsByEmotion: (emotion: string) => ipcRenderer.invoke('stats:getSongsByEmotion', emotion),
+    getSongsByScene: (scene: string) => ipcRenderer.invoke('stats:getSongsByScene', scene),
+    reanalyzeEmotions: () => ipcRenderer.invoke('stats:reanalyzeEmotions'),
+    analyzeSong: (song: any) => ipcRenderer.invoke('stats:analyzeSong', song),
+  },
+
+  // 全局热键事件监听
+  onGlobalHotkey: (type: 'playPause' | 'next' | 'previous' | 'volumeUp' | 'volumeDown', callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on(`global:${type}`, handler)
+    return () => ipcRenderer.removeListener(`global:${type}`, handler)
   },
 })

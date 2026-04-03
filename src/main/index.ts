@@ -6,6 +6,12 @@ import { PlaylistManager } from './playlistManager'
 import { SyncManager } from './syncManager'
 import { ConfigManager } from './configManager'
 import { DeviceManager } from './deviceManager'
+import { HotkeyManager } from './hotkeyManager'
+import { TrayManager } from './trayManager'
+import { DesktopLyricsWindow } from './desktopLyrics'
+import { StatsManager } from './statsManager'
+import { MiniWindowManager } from './miniWindowManager'
+import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
 
 let win: BrowserWindow | null = null
 const configManager = new ConfigManager()
@@ -14,6 +20,11 @@ const player = new Player()
 const playlistManager = new PlaylistManager()
 const syncManager = new SyncManager(musicLibrary, playlistManager)
 const deviceManager = new DeviceManager()
+const hotkeyManager = new HotkeyManager()
+const trayManager = new TrayManager()
+const statsManager = new StatsManager(musicLibrary)
+const miniWindowManager = new MiniWindowManager(win!)
+let desktopLyrics: DesktopLyricsWindow | null = null
 
 function createWindow() {
   win = new BrowserWindow({
@@ -36,6 +47,19 @@ function createWindow() {
   player.setWindow(win)
   syncManager.setWindow(win)
   deviceManager.setWindow(win)
+  
+  // 重新初始化 miniWindowManager（传入窗口）
+  miniWindowManager.mainWindow = win
+  
+  // 设置托盘
+  trayManager.setWindow(win)
+  trayManager.createTray()
+  
+  // 设置全局热键
+  setupHotkeys()
+  
+  // 初始化桌面歌词（可选功能，需要时创建）
+  ipcMain.handle('lyrics:isSupported', () => true)
 
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:5173')
@@ -46,6 +70,39 @@ function createWindow() {
 }
 
 let autoScanned = false
+
+function setupHotkeys() {
+  hotkeyManager.registerAllShortcuts({
+    playPause: () => {
+      win?.webContents.send('global:playPause')
+    },
+    next: () => {
+      win?.webContents.send('global:next')
+    },
+    previous: () => {
+      win?.webContents.send('global:previous')
+    },
+    volumeUp: () => {
+      win?.webContents.send('global:volumeUp')
+    },
+    volumeDown: () => {
+      win?.webContents.send('global:volumeDown')
+    },
+  })
+  
+  // 设置托盘回调
+  trayManager.setCallbacks({
+    playPause: () => {
+      win?.webContents.send('global:playPause')
+    },
+    next: () => {
+      win?.webContents.send('global:next')
+    },
+    previous: () => {
+      win?.webContents.send('global:previous')
+    },
+  })
+}
 
 ipcMain.handle('app:ready', async () => {
   if (autoScanned) return
@@ -75,6 +132,11 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  // 清理资源
+  hotkeyManager.unregisterAll()
+  trayManager.destroy()
+  desktopLyrics?.destroy()
+  
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -84,6 +146,11 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
+})
+
+// 将 Windows 最小化到托盘（而不是退出）
+app.on('before-quit', () => {
+  // 允许退出
 })
 
 // 音乐库相关
@@ -285,4 +352,136 @@ ipcMain.handle('device:importFrom', async (_, deviceId: string, options: any) =>
     console.error('Import error:', e)
     return { success: false, message: e.message || '导入失败', songsCopied: 0, songsSkipped: 0, songsDeleted: 0, playlistsSynced: 0, errors: [e.message], totalSize: 0, duration: 0 }
   }
+})
+
+// ===== Phase 1 新增功能：桌面歌词 =====
+ipcMain.handle('desktopLyrics:show', () => {
+  if (!desktopLyrics && win) {
+    desktopLyrics = new DesktopLyricsWindow(win)
+    desktopLyrics.create()
+  }
+  desktopLyrics?.show()
+  return true
+})
+
+ipcMain.handle('desktopLyrics:hide', () => {
+  desktopLyrics?.hide()
+  return true
+})
+
+ipcMain.handle('desktopLyrics:toggle', () => {
+  if (!desktopLyrics && win) {
+    desktopLyrics = new DesktopLyricsWindow(win)
+    desktopLyrics.create()
+    desktopLyrics.show()
+  } else if (desktopLyrics) {
+    desktopLyrics.destroy()
+    desktopLyrics = null
+  }
+  return desktopLyrics !== null
+})
+
+ipcMain.handle('desktopLyrics:update', (_, lines: string[], currentIndex: number) => {
+  desktopLyrics?.updateLyrics(lines, currentIndex)
+  return true
+})
+
+// ===== Phase 1 新增功能：听歌统计 =====
+ipcMain.handle('stats:startPlaying', (_, song: any) => {
+  statsManager.startPlaying(song)
+  return true
+})
+
+ipcMain.handle('stats:stopPlaying', (_, completed: boolean = false) => {
+  statsManager.stopCurrentPlay(completed)
+  return true
+})
+
+ipcMain.handle('stats:getStats', () => {
+  return statsManager.getStats()
+})
+
+ipcMain.handle('stats:getTopSongs', (_, limit: number = 10) => {
+  return statsManager.getTopSongs(limit)
+})
+
+ipcMain.handle('stats:getTopArtists', (_, limit: number = 10) => {
+  return statsManager.getTopArtists(limit)
+})
+
+ipcMain.handle('stats:getRecentlyPlayed', (_, limit: number = 20) => {
+  return statsManager.getRecentlyPlayed(limit)
+})
+
+ipcMain.handle('stats:getDailyStats', () => {
+  return statsManager.getDailyStats()
+})
+
+ipcMain.handle('stats:toggleFavorite', (_, songId: string) => {
+  return statsManager.toggleFavorite(songId)
+})
+
+ipcMain.handle('stats:addEmotionTag', (_, songId: string, tag: string) => {
+  statsManager.addEmotionTag(songId, tag)
+  return true
+})
+
+ipcMain.handle('stats:removeEmotionTag', (_, songId: string, tag: string) => {
+  statsManager.removeEmotionTag(songId, tag)
+  return true
+})
+
+ipcMain.handle('stats:clearStats', () => {
+  statsManager.clearStats()
+  return true
+})
+
+ipcMain.handle('stats:getRecommendations', (_, songId: string, limit: number = 10) => {
+  return statsManager.getRecommendations(songId, limit)
+})
+
+ipcMain.handle('stats:getSmartPlaylist', (_, scene: 'focus' | 'workout' | 'relax' | 'party') => {
+  return statsManager.getSmartPlaylist(scene)
+})
+
+ipcMain.handle('stats:getFavorites', () => {
+  return statsManager.getFavorites()
+})
+
+// 情绪分类相关
+ipcMain.handle('stats:getEmotionCategories', () => {
+  const categories = statsManager.getEmotionCategories()
+  console.log('getEmotionCategories returned:', categories.length, 'categories')
+  return categories
+})
+
+ipcMain.handle('stats:getSongsByEmotion', (_, emotion: string) => {
+  const songs = statsManager.getSongsByEmotion(emotion)
+  console.log('getSongsByEmotion for', emotion, ':', songs.length, 'songs')
+  return songs
+})
+
+ipcMain.handle('stats:getSongsByScene', (_, scene: string) => {
+  const songs = statsManager.getSongsByScene(scene)
+  console.log('getSongsByScene for', scene, ':', songs.length, 'songs')
+  return songs
+})
+
+ipcMain.handle('stats:reanalyzeEmotions', async () => {
+  console.log('stats:reanalyzeEmotions called!')
+  try {
+    statsManager.reanalyzeAllEmotions()
+    console.log('stats:reanalyzeEmotions completed!')
+    return true
+  } catch (e) {
+    console.error('stats:reanalyzeEmotions error:', e)
+    throw e
+  }
+})
+
+ipcMain.handle('stats:analyzeSong', (_, song: any) => {
+  console.log('Analyzing single song:', song.title)
+  const analysis = musicEmotionAnalyzer.analyzeEmotion(song)
+  const scenes = musicEmotionAnalyzer.classifyScene(song, analysis)
+  return { ...song, emotionAnalysis: analysis, sceneClassification: scenes }
 })

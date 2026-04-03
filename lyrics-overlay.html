@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桌面歌词</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: transparent;
+        overflow: hidden;
+        -webkit-app-region: drag;
+      }
+
+      .lyrics-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+      }
+
+      .lyrics-content {
+        text-align: center;
+      }
+
+      .lyrics-line {
+        font-size: 24px;
+        font-weight: 500;
+        color: white;
+        text-shadow: 
+          2px 2px 4px rgba(0, 0, 0, 0.8),
+          -1px -1px 0 rgba(0, 0, 0, 0.5),
+          1px -1px 0 rgba(0, 0, 0, 0.5),
+          -1px 1px 0 rgba(0, 0, 0, 0.5),
+          1px 1px 0 rgba(0, 0, 0, 0.5);
+        margin: 8px 0;
+        opacity: 0.6;
+        transition: all 0.3s ease;
+      }
+
+      .lyrics-line.active {
+        opacity: 1;
+        font-size: 28px;
+        font-weight: 700;
+        color: #e94560;
+        text-shadow: 
+          0 0 20px rgba(233, 69, 96, 0.8),
+          2px 2px 4px rgba(0, 0, 0, 0.8),
+          -1px -1px 0 rgba(0, 0, 0, 0.5),
+          1px -1px 0 rgba(0, 0, 0, 0.5),
+          -1px 1px 0 rgba(0, 0, 0, 0.5),
+          1px 1px 0 rgba(0, 0, 0, 0.5);
+      }
+
+      .context-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1000;
+      }
+
+      .menu {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        padding: 8px;
+        min-width: 180px;
+        pointer-events: auto;
+        -webkit-app-region: no-drag;
+      }
+
+      .menu-item {
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.15s;
+        color: #1a1a2e;
+      }
+
+      .menu-item:hover {
+        background: rgba(233, 69, 96, 0.1);
+        color: #e94560;
+      }
+
+      .menu-item.danger {
+        color: #dc3545;
+      }
+
+      .menu-item.danger:hover {
+        background: rgba(220, 53, 69, 0.1);
+      }
+
+      .menu-separator {
+        height: 1px;
+        background: rgba(0, 0, 0, 0.1);
+        margin: 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lyrics-container">
+      <div class="lyrics-content" id="lyrics">
+        <div class="lyrics-line">Melody Player - 桌面歌词</div>
+      </div>
+    </div>
+
+    <div class="context-menu" id="contextMenu" style="display: none;">
+      <div class="menu" id="menu" style="top: 0; left: 0;">
+        <div class="menu-item" data-action="lock">🔒 锁定</div>
+        <div class="menu-item" data-action="opacity">💧 透明度</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" data-action="hide">隐藏</div>
+        <div class="menu-item danger" data-action="close">关闭</div>
+      </div>
+    </div>
+
+    <script>
+      const lyricsEl = document.getElementById('lyrics')
+      const contextMenuEl = document.getElementById('contextMenu')
+      const menuEl = document.getElementById('menu')
+      let currentLines = []
+      let currentIndex = 0
+      let isLocked = false
+      let opacity = 0.9
+
+      // 监听主进程的歌词数据
+      window.electron?.ipcRenderer?.on('lyrics:data', (event, data) => {
+        const { lines, currentIndex } = data
+        currentLines = lines
+        renderLyrics(currentIndex)
+      })
+
+      function renderLyrics(activeIndex) {
+        currentIndex = activeIndex
+        lyricsEl.innerHTML = currentLines
+          .map((line, index) => {
+            if (index >= activeIndex - 1 && index <= activeIndex + 1) {
+              return `<div class="lyrics-line ${index === activeIndex ? 'active' : ''}">${line}</div>`
+            }
+            return ''
+          })
+          .join('')
+      }
+
+      // 右键菜单
+      document.addEventListener('contextmenu', (e) => {
+        e.preventDefault()
+        if (isLocked) return
+
+        const x = e.clientX
+        const y = e.clientY
+        
+        menuEl.style.top = `${y}px`
+        menuEl.style.left = `${x}px`
+        contextMenuEl.style.display = 'block'
+      })
+
+      // 点击关闭菜单
+      document.addEventListener('click', (e) => {
+        if (!menuEl.contains(e.target)) {
+          contextMenuEl.style.display = 'none'
+        }
+      })
+
+      // 菜单项点击
+      menuEl.addEventListener('click', async (e) => {
+        const menuItem = e.target.closest('.menu-item')
+        if (!menuItem) return
+
+        const action = menuItem.dataset.action
+        
+        switch (action) {
+          case 'lock':
+            isLocked = !isLocked
+            await window.electron.ipcRenderer.invoke('lyrics:toggleLock')
+            menuItem.textContent = isLocked ? '🔓 解锁' : '🔒 锁定'
+            break
+          
+          case 'opacity':
+            opacity = opacity > 0.6 ? 0.4 : 0.9
+            await window.electron.ipcRenderer.invoke('lyrics:setOpacity', opacity)
+            break
+          
+          case 'hide':
+            await window.electron.ipcRenderer.invoke('lyrics:hide')
+            break
+          
+          case 'close':
+            await window.electron.ipcRenderer.invoke('lyrics:close')
+            break
+        }
+
+        contextMenuEl.style.display = 'none'
+      })
+
+      // 双击切换锁定
+      document.addEventListener('dblclick', async () => {
+        if (!isLocked) {
+          isLocked = !isLocked
+          await window.electron.ipcRenderer.invoke('lyrics:toggleLock')
+        }
+      })
+
+      // 初始化
+      document.addEventListener('DOMContentLoaded', () => {
+        // 阻止默认右键菜单
+        document.addEventListener('contextmenu', (e) => e.preventDefault())
+      })
+    </script>
+  </body>
+</html>

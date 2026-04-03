@@ -7,10 +7,12 @@ const route = useRoute()
 const playlistStore = usePlaylistStore()
 
 const navItems = [
-  { path: '/', icon: 'home', label: '首页' },
-  { path: '/library', icon: 'library', label: '音乐库' },
-  { path: '/sync', icon: 'sync', label: '同步' },
-  { path: '/settings', icon: 'settings', label: '设置' },
+  { path: '/', icon: '🏠', label: '首页' },
+  { path: '/library', icon: '📚', label: '音乐库' },
+  { path: '/emotion', icon: '🎭', label: '情绪' },
+  { path: '/stats', icon: '📊', label: '统计' },
+  { path: '/sync', icon: '🔄', label: '同步' },
+  { path: '/settings', icon: '⚙️', label: '设置' },
 ]
 
 const navigate = (path: string) => {

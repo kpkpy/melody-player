@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useMusicStore } from '@/stores/music'
+import { usePlayerStore } from '@/stores/player'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
+// import VisualEffects from '@/components/VisualEffects.vue'
 import TitleBar from '@/components/TitleBar.vue'
 
 const musicStore = useMusicStore()
+const playerStore = usePlayerStore()
 const isAppReady = ref(false)
 const showContent = ref(false)
 const loadingText = ref('正在初始化...')
@@ -16,6 +19,9 @@ onMounted(async () => {
   
   loadingText.value = '读取歌曲数据...'
   await musicStore.loadLibrary()
+  
+  // 设置全局热键
+  playerStore.setupGlobalHotkeys()
   
   loadingText.value = '准备就绪'
   setTimeout(() => {
@@ -70,6 +76,7 @@ onMounted(async () => {
         </main>
       </div>
       <PlayerBar />
+      <!-- <VisualEffects /> -->
     </div>
   </Transition>
 </template>

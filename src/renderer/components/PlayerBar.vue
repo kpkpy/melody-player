@@ -12,6 +12,15 @@ const visualizerStyle = ref<'vu' | 'spectrum' | 'oscilloscope'>('vu')
 const lyrics = ref<string[]>([])
 const dominantColors = ref<string[]>(['#e94560', '#ff8a80'])
 const bgStyle = ref({})
+const showLyricsWindow = ref(false)
+const isMiniMode = ref(false)
+
+// 监听迷你模式变化
+if ((window as any).electron?.window) {
+  window.electron.window.onMiniModeChanged((mini: boolean) => {
+    isMiniMode.value = mini
+  })
+}
 
 const progress = computed(() => {
   if (playerStore.duration === 0) return 0
@@ -38,6 +47,24 @@ const setVolume = (e: MouseEvent) => {
   const rect = target.getBoundingClientRect()
   const percent = (e.clientX - rect.left) / rect.width
   playerStore.setVolume(percent)
+}
+
+const toggleLyricsWindow = async () => {
+  if ((window as any).electron?.desktopLyrics) {
+    showLyricsWindow.value = await window.electron.desktopLyrics.toggle()
+  }
+}
+
+const toggleMiniMode = () => {
+  if ((window as any).electron?.window) {
+    window.electron.window.toggleMini()
+  }
+}
+
+const togglePiPMode = () => {
+  if ((window as any).electron?.window) {
+    window.electron.window.togglePiP()
+  }
 }
 
 const togglePanel = () => {
@@ -407,11 +434,13 @@ const drawOscilloscope = (ctx: CanvasRenderingContext2D, data: Uint8Array, width
 
 watch(isPanelOpen, (open) => {
   if (open) {
-    initAudioContext()
-    connectAnalyser()
-    extractCoverColors()
+    requestAnimationFrame(() => {
+      extractCoverColors()
+    })
     if (activeTab.value === 'visualizer') {
       setTimeout(() => {
+        initAudioContext()
+        connectAnalyser()
         drawVisualizer()
       }, 100)
     }
@@ -455,6 +484,13 @@ watch(() => playerStore.currentSong, (song) => {
     lyrics.value = song.lyrics.split('\n')
   } else {
     lyrics.value = []
+  }
+  
+  // 更新桌面歌词
+  if ((window as any).electron?.desktopLyrics && showLyricsWindow.value) {
+    const line1 = song.artist || ''
+    const line2 = song.title || ''
+    window.electron.desktopLyrics.update([line1, line2], 0)
   }
 })
 
@@ -736,6 +772,28 @@ onUnmounted(() => {
             <text x="12" y="14" font-size="8" text-anchor="middle" fill="currentColor">1</text>
           </svg>
         </button>
+        <button class="desktop-lyrics-btn" :class="{ active: showLyricsWindow }" @click="toggleLyricsWindow" title="桌面歌词">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h2v2H6zm4-4h8v2h-8zm0 4h8v2h-8z"/>
+          </svg>
+        </button>
+        <button class="vinyl-btn" :class="{ active: showVinylMode }" @click="emitVinylMode" title="黑胶模式">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-12.5c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+          </svg>
+        </button>
+        <div class="window-controls">
+          <button class="window-btn" :class="{ active: isMiniMode }" @click="toggleMiniMode" title="迷你模式">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM6 19h9v-2H6v2zm0-4h15v-2H6v2zm0-4h15V9H6v2z"/>
+            </svg>
+          </button>
+          <button class="window-btn" @click="togglePiPMode" title="画中画">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>
+            </svg>
+          </button>
+        </div>
         <div class="volume-control">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
@@ -798,6 +856,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transform: translateZ(0);
+  will-change: transform, opacity;
 }
 
 .panel-bg {
@@ -814,6 +874,7 @@ onUnmounted(() => {
   filter: blur(80px);
   opacity: 0;
   animation: fadeInOrb 0.8s ease forwards, var(--orb-animation);
+  will-change: transform, opacity;
 }
 
 @keyframes fadeInOrb {
@@ -851,19 +912,22 @@ onUnmounted(() => {
 
 @keyframes floatOrb1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(50px, 30px) scale(1.1); }
-  66% { transform: translate(-30px, -20px) scale(0.95); }
+  25% { transform: translate(80px, 50px) scale(1.1); }
+  50% { transform: translate(40px, -40px) scale(0.95); }
+  75% { transform: translate(-60px, 30px) scale(1.05); }
 }
 
 @keyframes floatOrb2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-40px, -40px) scale(1.05); }
-  66% { transform: translate(30px, 20px) scale(0.9); }
+  25% { transform: translate(-70px, -60px) scale(1.05); }
+  50% { transform: translate(50px, 30px) scale(0.9); }
+  75% { transform: translate(-30px, 50px) scale(1.1); }
 }
 
 @keyframes floatOrb3 {
   0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
-  50% { transform: translateX(-50%) translateY(-30px) scale(1.15); }
+  33% { transform: translateX(-50%) translateY(-50px) scale(1.15); }
+  66% { transform: translateX(-50%) translateY(30px) scale(0.9); }
 }
 
 .gradient-overlay {
@@ -960,6 +1024,7 @@ onUnmounted(() => {
   filter: blur(40px);
   z-index: -1;
   animation: glowPulse 4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 @keyframes glowPulse {
@@ -982,6 +1047,7 @@ onUnmounted(() => {
     0 0 0 1px rgba(255, 255, 255, 0.5) inset;
   transform-style: preserve-3d;
   animation: coverFloat 6s ease-in-out infinite, coverFadeIn 0.5s ease;
+  will-change: transform, opacity;
 }
 
 @keyframes coverFadeIn {
@@ -1215,9 +1281,12 @@ onUnmounted(() => {
 }
 
 /* 过渡动画 */
-.fullscreen-enter-active,
+.fullscreen-enter-active {
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease;
+}
+
 .fullscreen-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
 }
 
 .fullscreen-enter-from,
@@ -1228,17 +1297,12 @@ onUnmounted(() => {
 
 .tab-fade-enter-active,
 .tab-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.2s ease;
 }
 
-.tab-fade-enter-from {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
+.tab-fade-enter-from,
 .tab-fade-leave-to {
   opacity: 0;
-  transform: scale(1.02);
 }
 
 /* 底部播放栏 */
@@ -1431,7 +1495,10 @@ onUnmounted(() => {
 }
 
 .queue-btn,
-.mode-btn {
+.mode-btn,
+.desktop-lyrics-btn,
+.vinyl-btn,
+.window-btn {
   position: relative;
   width: 32px;
   height: 32px;
@@ -1444,14 +1511,31 @@ onUnmounted(() => {
   margin-right: 8px;
 }
 
+.window-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.window-btn {
+  width: 28px;
+  height: 28px;
+  margin-right: 0;
+}
+
 .queue-btn:hover,
-.mode-btn:hover {
+.mode-btn:hover,
+.desktop-lyrics-btn:hover,
+.vinyl-btn:hover,
+.window-btn:hover {
   color: var(--accent-color-1, var(--accent));
   background: var(--accent-color-1-light, rgba(233, 69, 96, 0.1));
 }
 
 .queue-btn.active,
-.mode-btn.active {
+.mode-btn.active,
+.desktop-lyrics-btn.active,
+.vinyl-btn.active,
+.window-btn.active {
   color: var(--accent-color-1, var(--accent));
 }
 
