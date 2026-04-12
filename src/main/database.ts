@@ -1,14 +1,25 @@
-import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { parseFile } from 'music-metadata'
 
-let db: Database.Database | null = null
+let Database: any = null
+try {
+  Database = require('better-sqlite3')
+} catch (e) {
+  // Native module not available in dev mode
+  Database = null
+}
+let db: any = null
 const coverDir = join(app.getPath('userData'), 'covers')
 
 // Initialize database with schema
-export function initDatabase(): Database.Database {
+export function initDatabase(): any {
+  if (!Database) {
+    console.warn('better-sqlite3 not available, using memory-only mode')
+    return null
+  }
+  
   const dbPath = join(app.getPath('userData'), 'music-library.db')
   db = new Database(dbPath)
   
@@ -48,7 +59,6 @@ export function getDatabase(): Database.Database {
   return db
 }
 
-// Get file hash for cover filename
 function getFileHash(filePath: string): string {
   const crypto = require('crypto')
   return crypto.createHash('md5').update(filePath).digest('hex')
@@ -57,19 +67,6 @@ function getFileHash(filePath: string): string {
 // Extract and cache cover image
 export async function getSongCover(filePath: string): Promise<string | undefined> {
   try {
-    const db = getDatabase()
-    
-    // Check if cover is cached
-    const cached = db.prepare('SELECT cover_cached FROM tracks WHERE file_path = ?').get(filePath) as any
-    if (cached?.cover_cached) {
-      // Read from file
-      const coverPath = join(coverDir, `${getFileHash(filePath)}.jpg`)
-      if (existsSync(coverPath)) {
-        const data = readFileSync(coverPath)
-        return `data:image/jpeg;base64,${data.toString('base64')}`
-      }
-    }
-    
     // Parse and extract cover
     const metadata = await parseFile(filePath, { skipCovers: false })
     if (metadata.common.picture && metadata.common.picture.length > 0) {
@@ -79,8 +76,10 @@ export async function getSongCover(filePath: string): Promise<string | undefined
       // Save to file
       writeFileSync(coverPath, pic.data)
       
-      // Mark as cached in database
-      db.prepare('UPDATE tracks SET cover_cached = 1 WHERE file_path = ?').run(filePath)
+      // Try to update database (may fail in dev mode)
+      if (db) {
+        db.prepare('UPDATE tracks SET cover_cached = 1 WHERE file_path = ?').run(filePath)
+      }
       
       return `data:image/jpeg;base64,${pic.data.toString('base64')}`
     }
@@ -92,12 +91,13 @@ export async function getSongCover(filePath: string): Promise<string | undefined
 
 // Get or create track entry
 export function upsertTrack(filePath: string, metadata: any, mtime: number) {
-  const db = getDatabase()
+  if (!db) return
+  
   const common = metadata.common
   
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO tracks (file_path, title, artist, album, duration_ms, mtime, cover_cached)
-    VALUES (?, ?, ?, ?, ?, ?, cover_cached)
+    INSERT OR REPLACE INTO tracks (file_path, title, artist, album, duration_ms, mtime)
+    VALUES (?, ?, ?, ?, ?, ?)
   `)
   
   stmt.run(
@@ -107,14 +107,12 @@ export function upsertTrack(filePath: string, metadata: any, mtime: number) {
     common.album || 'Unknown Album',
     metadata.format.duration ? Math.round(metadata.format.duration * 1000) : null,
     mtime,
-    // Keep existing cover_cached status
   )
 }
 
 // Get all tracks
 export function getAllTracks(): any[] {
-  const db = getDatabase()
-  return db.prepare('SELECT * FROM tracks').all()
+  return db?.prepare('SELECT * FROM tracks').all() || []
 }
 
 // Close database
