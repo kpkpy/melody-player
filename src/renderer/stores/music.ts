@@ -61,8 +61,9 @@ export const useMusicStore = defineStore('music', () => {
     
     try {
       const plainPaths = JSON.parse(JSON.stringify(paths))
-      await window.electron.library.scan(plainPaths, forceRescan)
+      const result = await window.electron.library.scan(plainPaths, forceRescan)
       await loadLibrary()
+      return result
     } finally {
       isLoading.value = false
       scanProgress.value = null

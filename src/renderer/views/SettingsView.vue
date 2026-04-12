@@ -6,6 +6,9 @@ const musicStore = useMusicStore()
 const newDir = ref('')
 const musicDirs = ref<string[]>([])
 
+// Scan result display
+const scanResult = ref<{ count: number; added: number; duplicates: number } | null>(null)
+
 // YouTube download state
 const youtubeUrl = ref('')
 const customAuthor = ref('')
@@ -37,7 +40,11 @@ const removeDir = async (index: number) => {
 const scanAll = async (forceRescan: boolean = false) => {
   if (musicDirs.value.length === 0) return
   const paths = toRaw(musicDirs.value)
-  await musicStore.scanLibrary(paths, forceRescan)
+  scanResult.value = null
+  const result = await musicStore.scanLibrary(paths, forceRescan)
+  if (result) {
+    scanResult.value = { count: result.count, added: result.added, duplicates: result.duplicates }
+  }
 }
 
 const clearCache = async () => {
@@ -220,6 +227,9 @@ const formatDuration = (seconds: number): string => {
         </button>
       </div>
       <p class="hint">增量扫描只解析新增或修改的文件，强制重新扫描会解析所有文件</p>
+      <div v-if="scanResult" class="scan-result">
+        <p>扫描完成！共发现 <strong>{{ scanResult.count }}</strong> 个音频文件，新增 <strong>{{ scanResult.added }}</strong> 首，去重 <strong>{{ scanResult.duplicates }}</strong> 首</p>
+      </div>
     </section>
 
     <section class="settings-section animate-fade-in-up delay-200">
@@ -493,6 +503,23 @@ const formatDuration = (seconds: number): string => {
   font-size: 12px;
   color: var(--text-secondary);
   opacity: 0.7;
+}
+
+.scan-result {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgba(233, 69, 96, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(233, 69, 96, 0.2);
+}
+
+.scan-result p {
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.scan-result strong {
+  font-weight: 600;
 }
 
 /* 列表动画 */
