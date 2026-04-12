@@ -113,10 +113,24 @@ const startDownload = async () => {
   try {
     const result = await window.electron.youtube.download(youtubeUrl.value, customAuthor.value)
     if (result.success) {
-      // Refresh library - include both user dirs and download dir
-      const downloadDir = await window.electron.youtube.getDownloadDir()
-      const allPaths = [...toRaw(musicDirs.value), downloadDir]
-      await musicStore.scanLibrary(allPaths, false)
+      if (result.isDuplicate) {
+        // Song already exists in library
+        downloadProgress.value = { 
+          status: 'completed', 
+          progress: 100, 
+          message: '歌曲已存在于音乐库中（重复），未新增' 
+        }
+      } else {
+        // Refresh library - include both user dirs and download dir
+        const downloadDir = await window.electron.youtube.getDownloadDir()
+        const allPaths = [...toRaw(musicDirs.value), downloadDir]
+        await musicStore.scanLibrary(allPaths, false)
+        downloadProgress.value = { 
+          status: 'completed', 
+          progress: 100, 
+          message: '下载完成并已添加到音乐库！' 
+        }
+      }
       // Reset form
       youtubeUrl.value = ''
       videoPreview.value = null

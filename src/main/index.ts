@@ -502,13 +502,18 @@ ipcMain.handle('youtube:getVideoInfo', async (_, url: string) => {
 ipcMain.handle('youtube:download', async (_, url: string, customAuthor?: string) => {
   try {
     const result = await youtubeDownloader.downloadAsAudio(url, customAuthor)
-    // Add to music library
+    // Add to music library (with deduplication check)
     const song = result.songInfo
-    musicLibrary.addSong(song)
+    const added = musicLibrary.addSong(song)
     playlistManager.setSongs(musicLibrary.getSongs())
     // Notify frontend to update
     win?.webContents.send('library:updated', musicLibrary.getSongs())
-    return { success: true, filePath: result.filePath, songInfo: song }
+    return { 
+      success: true, 
+      filePath: result.filePath, 
+      songInfo: song,
+      isDuplicate: !added // True if song was duplicate and not added
+    }
   } catch (e: any) {
     return { success: false, error: e.message }
   }

@@ -129,7 +129,7 @@ interface ElectronAPI {
   }
   youtube: {
     getVideoInfo: (url: string) => Promise<{ success: boolean; info?: YouTubeVideoInfo; error?: string }>
-    download: (url: string, customAuthor?: string) => Promise<{ success: boolean; filePath?: string; songInfo?: any; error?: string }>
+    download: (url: string, customAuthor?: string) => Promise<{ success: boolean; filePath?: string; songInfo?: any; error?: string; isDuplicate?: boolean }>
     cancelDownload: () => Promise<boolean>
     getDownloadDir: () => Promise<string>
     setDownloadDir: (dir: string) => Promise<boolean>

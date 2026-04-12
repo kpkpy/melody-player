@@ -53,6 +53,7 @@ export class MusicLibrary {
   private songs: Map<string, Song> = new Map()
   private albums: Map<string, Album> = new Map()
   private artists: Map<string, Artist> = new Map()
+  private songKeys: Map<string, string> = new Map() // title+artist -> songId for deduplication
   private win: BrowserWindow | null = null
   private cachePath: string
 
@@ -62,6 +63,19 @@ export class MusicLibrary {
 
   setWindow(win: BrowserWindow) {
     this.win = win
+  }
+
+  // Generate deduplication key from title and artist
+  private getSongKey(title: string, artist: string): string {
+    const normalizedTitle = title.toLowerCase().trim()
+    const normalizedArtist = artist.toLowerCase().trim()
+    return `${normalizedTitle}|${normalizedArtist}`
+  }
+
+  // Check if song with same title and artist already exists
+  isDuplicate(title: string, artist: string): boolean {
+    const key = this.getSongKey(title, artist)
+    return this.songKeys.has(key)
   }
 
   private notifyProgress(phase: string, current: number, total: number, currentFile?: string) {
@@ -113,9 +127,15 @@ export class MusicLibrary {
     
     for (let i = 0; i < cachedSongs.length; i++) {
       const song = cachedSongs[i]
-      this.songs.set(song.id, song)
-      this.addToAlbum(song)
-      this.addToArtist(song)
+      
+      // Check for duplicates while loading
+      const key = this.getSongKey(song.title, song.artist)
+      if (!this.songKeys.has(key)) {
+        this.songs.set(song.id, song)
+        this.songKeys.set(key, song.id)
+        this.addToAlbum(song)
+        this.addToArtist(song)
+      }
       
       if (i % 100 === 0) {
         this.notifyProgress('loading', i, cachedSongs.length, '加载缓存...')
@@ -165,16 +185,26 @@ export class MusicLibrary {
         const cached = cachedMap.get(filePath)
         
         if (cached && cached.mtime && cached.mtime >= mtime) {
-          this.songs.set(cached.id, cached)
-          this.addToAlbum(cached)
-          this.addToArtist(cached)
+          // Check for duplicates
+          const key = this.getSongKey(cached.title, cached.artist)
+          if (!this.songKeys.has(key)) {
+            this.songs.set(cached.id, cached)
+            this.songKeys.set(key, cached.id)
+            this.addToAlbum(cached)
+            this.addToArtist(cached)
+          }
         } else {
           try {
             const metadata = await parseFile(filePath)
             const song = this.createSong(filePath, metadata, mtime)
-            this.songs.set(song.id, song)
-            this.addToAlbum(song)
-            this.addToArtist(song)
+            // Check for duplicates
+            const key = this.getSongKey(song.title, song.artist)
+            if (!this.songKeys.has(key)) {
+              this.songs.set(song.id, song)
+              this.songKeys.set(key, song.id)
+              this.addToAlbum(song)
+              this.addToArtist(song)
+            }
           } catch (e) {
             // 忽略解析错误
           }
@@ -379,11 +409,19 @@ export class MusicLibrary {
     return undefined
   }
 
-  addSong(song: Song): void {
+  addSong(song: Song): boolean {
+    // Check for duplicates
+    const key = this.getSongKey(song.title, song.artist)
+    if (this.songKeys.has(key)) {
+      return false // Duplicate, not added
+    }
+    
     this.songs.set(song.id, song)
+    this.songKeys.set(key, song.id)
     this.addToAlbum(song)
     this.addToArtist(song)
     this.saveCache()
+    return true // Successfully added
   }
 
   clearCache(): void {
