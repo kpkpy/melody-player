@@ -338,23 +338,7 @@ return {
       // Ignore parse errors
     }
     return undefined
-  }
-
-  // Load cover on demand when displaying song
-  async getSongCover(filePath: string): Promise<string | undefined> {
-    try {
-      // Parse with skipCovers=false to get cover
-      const metadata = await parseFile(filePath)
-      const common = metadata.common
-      if (common.picture && common.picture.length > 0) {
-        const pic = common.picture[0]
-        return `data:${pic.format};base64,${pic.data.toString('base64')}`
-      }
-    } catch (e) {
-      // Ignore parse errors
-    }
-    return undefined
-  }
+}
 
   private getFileName(filePath: string): string {
     const parts = filePath.split(/[/\\]/)
