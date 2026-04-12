@@ -1,17 +1,32 @@
 <script setup lang="ts">
-defineProps<{
+import { ref, onMounted } from 'vue'
+
+const props = defineProps<{
   song: any
 }>()
 
 defineEmits<{
   click: []
 }>()
+
+const coverUrl = ref<string | undefined>(props.song.cover)
+
+// Load cover on demand if not already loaded
+onMounted(async () => {
+  if (!coverUrl.value && props.song.filePath) {
+    try {
+      coverUrl.value = await window.electron.library.getSongCover(props.song.filePath)
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+})
 </script>
 
 <template>
   <div class="song-card" @click="$emit('click')">
-    <div class="card-cover" :style="{ backgroundImage: song.cover ? `url(${song.cover})` : 'none' }">
-      <div v-if="!song.cover" class="cover-placeholder">♪</div>
+    <div class="card-cover" :style="{ backgroundImage: coverUrl ? `url(${coverUrl})` : 'none' }">
+      <div v-if="!coverUrl" class="cover-placeholder">♪</div>
       <div class="play-overlay">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
           <path d="M8 5v14l11-7z" />

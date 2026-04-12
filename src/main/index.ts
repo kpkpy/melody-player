@@ -180,6 +180,10 @@ ipcMain.handle('library:getArtists', async () => {
   return musicLibrary.getArtists()
 })
 
+ipcMain.handle('library:getSongCover', async (_, filePath: string) => {
+  return await musicLibrary.getSongCover(filePath)
+})
+
 // 歌单相关
 ipcMain.handle('playlist:create', async (_, name: string) => {
   return playlistManager.create(name)

@@ -195,7 +195,8 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
           addedCount++
         } else {
           try {
-            const metadata = await parseFile(filePath)
+            // Parse metadata without covers to save memory during scan
+            const metadata = await parseFile(filePath, { skipCovers: true })
             const song = this.createSong(filePath, metadata, mtime)
             const key = this.getSongKey(song.filePath)
             this.songs.set(song.id, song)
@@ -261,15 +262,12 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
     await scan(basePath)
   }
 
-  private createSong(filePath: string, metadata: any, mtime: number): Song {
+private createSong(filePath: string, metadata: any, mtime: number): Song {
     const id = Buffer.from(filePath).toString('base64')
     const common = metadata.common
     
-    let cover: string | undefined = undefined
-    if (common.picture && common.picture.length > 0) {
-      const pic = common.picture[0]
-      cover = `data:${pic.format};base64,${pic.data.toString('base64')}`
-    }
+    // Don't extract cover during scan - load on demand later
+    // This saves memory during bulk scanning
 
     let lyrics: string | undefined = undefined
     if (metadata.native) {
@@ -293,10 +291,54 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
       duration: Math.round(metadata.format.duration || 0),
       filePath,
       audioUrl: `audio://${filePath}`,
-      cover,
+      cover: undefined,
       lyrics,
       mtime,
     }
+  }
+
+    let lyrics: string | undefined = undefined
+    if (metadata.native) {
+      for (const format of Object.values(metadata.native)) {
+        const tags = format as any[]
+        for (const tag of tags) {
+          if (tag.id === 'USLT' || tag.id === 'lyrics' || tag.id === 'LYRICS' || tag.id === 'unsynchronisedLyrics') {
+            lyrics = typeof tag.value === 'string' ? tag.value : tag.value?.text || tag.value?.lyrics
+            break
+          }
+        }
+        if (lyrics) break
+      }
+    }
+
+    return {
+      id,
+      title: common.title || this.getFileName(filePath),
+      artist: common.artist || 'Unknown Artist',
+      album: common.album || 'Unknown Album',
+      duration: Math.round(metadata.format.duration || 0),
+      filePath,
+      audioUrl: `audio://${filePath}`,
+      cover: undefined,
+      lyrics,
+      mtime,
+    }
+  }
+
+  // Load cover on demand when displaying song
+  async getSongCover(filePath: string): Promise<string | undefined> {
+    try {
+      // Parse with skipCovers=false to get cover
+      const metadata = await parseFile(filePath)
+      const common = metadata.common
+      if (common.picture && common.picture.length > 0) {
+        const pic = common.picture[0]
+        return `data:${pic.format};base64,${pic.data.toString('base64')}`
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return undefined
   }
 
   private getFileName(filePath: string): string {
