@@ -385,8 +385,9 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
       duration: song.duration,
       filePath: song.filePath,
       audioUrl: song.audioUrl,
-      cover: song.cover,
-      lyrics: song.lyrics,
+      // Don't cache cover/lyrics - they're too large and will be loaded on demand
+      // cover: song.cover,
+      // lyrics: song.lyrics,
       mtime: song.mtime,
     }))
   }
