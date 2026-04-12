@@ -7,7 +7,7 @@ const newDir = ref('')
 const musicDirs = ref<string[]>([])
 
 // Scan result display
-const scanResult = ref<{ count: number; added: number; duplicates: number; parseErrors: number } | null>(null)
+const scanResult = ref<{ count: number; added: number; parseErrors: number } | null>(null)
 
 // YouTube download state
 const youtubeUrl = ref('')
@@ -43,7 +43,7 @@ const scanAll = async (forceRescan: boolean = false) => {
   scanResult.value = null
   const result = await musicStore.scanLibrary(paths, forceRescan)
   if (result) {
-    scanResult.value = { count: result.count, added: result.added, duplicates: result.duplicates, parseErrors: result.parseErrors }
+    scanResult.value = { count: result.count, added: result.added, parseErrors: result.parseErrors }
   }
 }
 
@@ -228,7 +228,7 @@ const formatDuration = (seconds: number): string => {
       </div>
       <p class="hint">增量扫描只解析新增或修改的文件，强制重新扫描会解析所有文件</p>
       <div v-if="scanResult" class="scan-result">
-        <p>扫描完成！共发现 <strong>{{ scanResult.count }}</strong> 个音频文件，新增 <strong>{{ scanResult.added }}</strong> 首，去重 <strong>{{ scanResult.duplicates }}</strong> 首，解析失败 <strong>{{ scanResult.parseErrors }}</strong> 个</p>
+        <p>扫描完成！共发现 <strong>{{ scanResult.count }}</strong> 个音频文件，成功添加 <strong>{{ scanResult.added }}</strong> 首，解析失败 <strong>{{ scanResult.parseErrors }}</strong> 个</p>
       </div>
     </section>
 

@@ -76,7 +76,7 @@ interface ElectronAPI {
     ready: () => Promise<void>
   }
   library: {
-    scan: (paths: string[], forceRescan?: boolean) => Promise<{ count: number; added: number; duplicates: number; parseErrors: number; errors: string[] }>
+    scan: (paths: string[], forceRescan?: boolean) => Promise<{ count: number; added: number; parseErrors: number; errors: string[] }>
     getSongs: () => Promise<any[]>
     getAlbums: () => Promise<any[]>
     getArtists: () => Promise<any[]>

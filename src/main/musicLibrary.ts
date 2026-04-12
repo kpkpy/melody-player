@@ -163,6 +163,7 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
     const allFiles: string[] = []
     const fileStats = new Map<string, number>()
     let parseErrors = 0
+    let addedCount = 0
     
     for (const basePath of paths) {
       try {
@@ -181,35 +182,32 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
     for (let i = 0; i < allFiles.length; i += batchSize) {
       const batch = allFiles.slice(i, i + batchSize)
       
-      await Promise.all(batch.map(async (filePath) => {
+      for (const filePath of batch) {
         const mtime = fileStats.get(filePath) || 0
         const cached = cachedMap.get(filePath)
         
         if (cached && cached.mtime && cached.mtime >= mtime) {
           const key = this.getSongKey(cached.filePath)
-          if (!this.songKeys.has(key)) {
-            this.songs.set(cached.id, cached)
-            this.songKeys.set(key, cached.id)
-            this.addToAlbum(cached)
-            this.addToArtist(cached)
-          }
+          this.songs.set(cached.id, cached)
+          this.songKeys.set(key, cached.id)
+          this.addToAlbum(cached)
+          this.addToArtist(cached)
+          addedCount++
         } else {
           try {
             const metadata = await parseFile(filePath)
             const song = this.createSong(filePath, metadata, mtime)
             const key = this.getSongKey(song.filePath)
-            if (!this.songKeys.has(key)) {
-              this.songs.set(song.id, song)
-              this.songKeys.set(key, song.id)
-              this.addToAlbum(song)
-              this.addToArtist(song)
-            }
+            this.songs.set(song.id, song)
+            this.songKeys.set(key, song.id)
+            this.addToAlbum(song)
+            this.addToArtist(song)
+            addedCount++
           } catch (e: any) {
             parseErrors++
-            console.warn(`Parse error for ${filePath}: ${e.message}`)
           }
         }
-      }))
+      }
       
       processed += batch.length
       this.notifyProgress('parsing', processed, total, batch[batch.length - 1])
@@ -218,8 +216,7 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
     this.saveCache()
     return { 
       count: allFiles.length, 
-      added: this.songs.size,
-      duplicates: allFiles.length - this.songs.size - parseErrors - errors.length,
+      added: addedCount,
       parseErrors,
       errors 
     }
@@ -416,10 +413,10 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
   }
 
   addSong(song: Song): boolean {
-    // Check for duplicates using filePath as unique identifier
+    // Check if filePath already exists
     const key = this.getSongKey(song.filePath)
     if (this.songKeys.has(key)) {
-      return false // Duplicate, not added
+      return false // File already in library
     }
     
     this.songs.set(song.id, song)
@@ -427,7 +424,7 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
     this.addToAlbum(song)
     this.addToArtist(song)
     this.saveCache()
-    return true // Successfully added
+    return true
   }
 
   clearCache(): void {
