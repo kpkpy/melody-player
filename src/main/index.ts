@@ -13,6 +13,7 @@ import { StatsManager } from './statsManager'
 import { MiniWindowManager } from './miniWindowManager'
 import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
 import { YouTubeDownloader } from './youtubeDownloader'
+import { initDatabase, getSongCover } from './database'
 
 let win: BrowserWindow | null = null
 const configManager = new ConfigManager()
@@ -122,6 +123,9 @@ ipcMain.handle('app:ready', async () => {
 })
 
 app.whenReady().then(() => {
+  // Initialize SQLite database
+  initDatabase()
+  
   protocol.registerFileProtocol('audio', (request, callback) => {
     const url = request.url.substr(7)
     try {
@@ -178,6 +182,14 @@ ipcMain.handle('library:getAlbums', async () => {
 
 ipcMain.handle('library:getArtists', async () => {
   return musicLibrary.getArtists()
+})
+
+ipcMain.handle('library:getSongCover', async (_, filePath: string) => {
+  try {
+    return await getSongCover(filePath)
+  } catch (e) {
+    return undefined
+  }
 })
 
 // 歌单相关

@@ -81,6 +81,7 @@ interface ElectronAPI {
     getAlbums: () => Promise<any[]>
     getArtists: () => Promise<any[]>
     clearCache: () => Promise<boolean>
+    getSongCover: (filePath: string) => Promise<string | undefined>
     onScanProgress: (callback: (progress: { phase: string; current: number; total: number; currentFile: string }) => void) => (() => void)
     onUpdated: (callback: (songs: any[]) => void) => (() => void)
   }
