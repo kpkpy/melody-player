@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld('electron', {
     getAlbums: () => ipcRenderer.invoke('library:getAlbums'),
     getArtists: () => ipcRenderer.invoke('library:getArtists'),
     clearCache: () => ipcRenderer.invoke('library:clearCache'),
-    getSongCover: (filePath: string) => ipcRenderer.invoke('library:getSongCover', filePath),
     onScanProgress: (callback: (progress: { phase: string; current: number; total: number; currentFile: string }) => void) => {
       const handler = (_event: IpcRendererEvent, progress: { phase: string; current: number; total: number; currentFile: string }) => {
         callback(progress)

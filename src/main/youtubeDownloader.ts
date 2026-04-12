@@ -249,7 +249,7 @@ export class YouTubeDownloader {
     
     // Sanitize filename
     const safeTitle = this.sanitizeFileName(videoInfo.title)
-    const outputPath = join(this.downloadDir, `${safeTitle}.m4a`)
+    let outputPath = join(this.downloadDir, `${safeTitle}.m4a`)
 
     this.notifyProgress({
       status: 'downloading',

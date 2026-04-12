@@ -295,35 +295,7 @@ private createSong(filePath: string, metadata: any, mtime: number): Song {
       lyrics,
       mtime,
     }
-  }
-
-    let lyrics: string | undefined = undefined
-    if (metadata.native) {
-      for (const format of Object.values(metadata.native)) {
-        const tags = format as any[]
-        for (const tag of tags) {
-          if (tag.id === 'USLT' || tag.id === 'lyrics' || tag.id === 'LYRICS' || tag.id === 'unsynchronisedLyrics') {
-            lyrics = typeof tag.value === 'string' ? tag.value : tag.value?.text || tag.value?.lyrics
-            break
-          }
-        }
-        if (lyrics) break
-      }
-    }
-
-return {
-      id,
-      title: common.title || this.getFileName(filePath),
-      artist: common.artist || 'Unknown Artist',
-      album: common.album || 'Unknown Album',
-      duration: Math.round(metadata.format.duration || 0),
-      filePath,
-      audioUrl: `audio://${filePath}`,
-      cover: undefined,
-      lyrics,
-      mtime,
-    }
-  }
+}
 
   // Load cover on demand when displaying song - not cached in memory
   async getSongCover(filePath: string): Promise<string | undefined> {
