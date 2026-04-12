@@ -204,7 +204,15 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
             this.addToArtist(song)
             addedCount++
           } catch (e: any) {
+            // Parse failed - still add song using filename
             parseErrors++
+            const song = this.createSongFromFilename(filePath, mtime)
+            const key = this.getSongKey(song.filePath)
+            this.songs.set(song.id, song)
+            this.songKeys.set(key, song.id)
+            this.addToAlbum(song)
+            this.addToArtist(song)
+            addedCount++
           }
         }
       }
@@ -294,6 +302,45 @@ async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: numb
   private getFileName(filePath: string): string {
     const parts = filePath.split(/[/\\]/)
     return parts[parts.length - 1].replace(/\.[^.]+$/, '')
+  }
+
+  // Create song from filename when metadata parsing fails
+  // Assumes format: "Artist - Title.ext" or "Artist- Title.ext"
+  private createSongFromFilename(filePath: string, mtime: number): Song {
+    const id = Buffer.from(filePath).toString('base64')
+    const fileName = this.getFileName(filePath)
+    
+    // Try to parse "Artist - Title" format
+    let title = fileName
+    let artist = 'Unknown Artist'
+    let album = 'Unknown Album'
+    
+    // Common patterns: "Artist - Title" or "Artist- Title" or "Artist,Other - Title"
+    const dashMatch = fileName.match(/^(.+?)\s*-\s*(.+)$/)
+    if (dashMatch) {
+      artist = dashMatch[1].trim()
+      title = dashMatch[2].trim()
+    }
+    
+    // Get album from parent directory name
+    const parts = filePath.split(/[/\\]/)
+    if (parts.length >= 3) {
+      // Parent folder is often the album name
+      album = parts[parts.length - 2] || 'Unknown Album'
+    }
+    
+    return {
+      id,
+      title,
+      artist,
+      album,
+      duration: 0,
+      filePath,
+      audioUrl: `audio://${filePath}`,
+      cover: undefined,
+      lyrics: undefined,
+      mtime,
+    }
   }
 
   private addToAlbum(song: Song): void {
