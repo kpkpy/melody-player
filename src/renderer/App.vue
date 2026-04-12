@@ -20,6 +20,9 @@ onMounted(async () => {
   loadingText.value = '读取歌曲数据...'
   await musicStore.loadLibrary()
   
+  // Setup library update listener
+  musicStore.setupListeners()
+  
   // 设置全局热键
   playerStore.setupGlobalHotkeys()
   

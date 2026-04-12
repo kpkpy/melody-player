@@ -55,6 +55,22 @@ interface SyncState {
   syncedPlaylists: string[]
 }
 
+interface YouTubeVideoInfo {
+  id: string
+  title: string
+  author: string
+  thumbnail: string
+  duration: number
+  description?: string
+}
+
+interface YouTubeDownloadProgress {
+  status: 'downloading' | 'converting' | 'writing_metadata' | 'completed' | 'error'
+  progress: number
+  message: string
+  videoTitle?: string
+}
+
 interface ElectronAPI {
   app: {
     ready: () => Promise<void>
@@ -66,6 +82,7 @@ interface ElectronAPI {
     getArtists: () => Promise<any[]>
     clearCache: () => Promise<boolean>
     onScanProgress: (callback: (progress: { phase: string; current: number; total: number; currentFile: string }) => void) => (() => void)
+    onUpdated: (callback: (songs: any[]) => void) => (() => void)
   }
   player: {
     onStateChange: (callback: (state: any) => void) => (() => void)
@@ -109,6 +126,16 @@ interface ElectronAPI {
     setMusicDirs: (dirs: string[]) => Promise<boolean>
     addMusicDir: (dir: string) => Promise<boolean>
     removeMusicDir: (dir: string) => Promise<boolean>
+  }
+  youtube: {
+    getVideoInfo: (url: string) => Promise<{ success: boolean; info?: YouTubeVideoInfo; error?: string }>
+    download: (url: string, customAuthor?: string) => Promise<{ success: boolean; filePath?: string; songInfo?: any; error?: string }>
+    cancelDownload: () => Promise<boolean>
+    getDownloadDir: () => Promise<string>
+    setDownloadDir: (dir: string) => Promise<boolean>
+    isValidUrl: (url: string) => Promise<boolean>
+    isAvailable: () => Promise<boolean>
+    onDownloadProgress: (callback: (progress: YouTubeDownloadProgress) => void) => (() => void)
   }
 }
 

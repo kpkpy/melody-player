@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 
 export interface Song {
   id: string
@@ -26,6 +26,18 @@ export const useMusicStore = defineStore('music', () => {
   const artists = ref<any[]>([])
   const isLoading = ref(false)
   const scanProgress = ref<ScanProgress | null>(null)
+
+  // Setup library update listener
+  const setupListeners = () => {
+    const removeListener = window.electron.library.onUpdated((updatedSongs: any[]) => {
+      songs.value = updatedSongs
+      // Also refresh albums and artists
+      window.electron.library.getAlbums().then(data => albums.value = data)
+      window.electron.library.getArtists().then(data => artists.value = data)
+    })
+    
+    return removeListener
+  }
 
   const loadLibrary = async () => {
     isLoading.value = true
@@ -70,5 +82,6 @@ export const useMusicStore = defineStore('music', () => {
     loadLibrary,
     scanLibrary,
     setProgress,
+    setupListeners,
   }
 })

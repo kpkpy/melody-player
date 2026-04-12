@@ -6,8 +6,19 @@ const musicStore = useMusicStore()
 const newDir = ref('')
 const musicDirs = ref<string[]>([])
 
+// YouTube download state
+const youtubeUrl = ref('')
+const customAuthor = ref('')
+const youtubeDownloadDir = ref('')
+const isDownloading = ref(false)
+const downloadProgress = ref<{ status: string; progress: number; message: string; videoTitle?: string } | null>(null)
+const videoPreview = ref<{ title: string; author: string; thumbnail: string; duration: number } | null>(null)
+const ytDlpAvailable = ref(false)
+
 onMounted(async () => {
   musicDirs.value = await window.electron.config.getMusicDirs()
+  youtubeDownloadDir.value = await window.electron.youtube.getDownloadDir()
+  ytDlpAvailable.value = await window.electron.youtube.isAvailable()
 })
 
 const addDir = async () => {
@@ -43,7 +54,94 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (removeListener) removeListener()
+  if (youtubeListener) youtubeListener()
 })
+
+// YouTube download functions
+let youtubeListener: (() => void) | null = null
+
+onMounted(() => {
+  youtubeListener = window.electron.youtube.onDownloadProgress((progress) => {
+    downloadProgress.value = progress
+    if (progress.status === 'completed' || progress.status === 'error') {
+      isDownloading.value = false
+    }
+  })
+})
+
+const getVideoInfo = async () => {
+  if (!youtubeUrl.value) return
+  
+  const isValid = await window.electron.youtube.isValidUrl(youtubeUrl.value)
+  if (!isValid) {
+    videoPreview.value = null
+    return
+  }
+
+  try {
+    const result = await window.electron.youtube.getVideoInfo(youtubeUrl.value)
+    if (result.success) {
+      videoPreview.value = {
+        title: result.info.title,
+        author: result.info.author,
+        thumbnail: result.info.thumbnail,
+        duration: result.info.duration
+      }
+      if (!customAuthor.value) {
+        customAuthor.value = result.info.author
+      }
+    } else {
+      videoPreview.value = null
+    }
+  } catch {
+    videoPreview.value = null
+  }
+}
+
+const startDownload = async () => {
+  if (!youtubeUrl.value || isDownloading.value) return
+  
+  const isValid = await window.electron.youtube.isValidUrl(youtubeUrl.value)
+  if (!isValid) {
+    downloadProgress.value = { status: 'error', progress: 0, message: '无效的 YouTube URL' }
+    return
+  }
+
+  isDownloading.value = true
+  downloadProgress.value = { status: 'downloading', progress: 0, message: '准备下载...' }
+
+  try {
+    const result = await window.electron.youtube.download(youtubeUrl.value, customAuthor.value)
+    if (result.success) {
+      // Refresh library - include both user dirs and download dir
+      const downloadDir = await window.electron.youtube.getDownloadDir()
+      const allPaths = [...toRaw(musicDirs.value), downloadDir]
+      await musicStore.scanLibrary(allPaths, false)
+      // Reset form
+      youtubeUrl.value = ''
+      videoPreview.value = null
+      customAuthor.value = ''
+    } else {
+      downloadProgress.value = { status: 'error', progress: 0, message: result.error || '下载失败' }
+      isDownloading.value = false
+    }
+  } catch (e: any) {
+    downloadProgress.value = { status: 'error', progress: 0, message: e.message || '下载失败' }
+    isDownloading.value = false
+  }
+}
+
+const cancelDownload = async () => {
+  await window.electron.youtube.cancelDownload()
+  isDownloading.value = false
+  downloadProgress.value = { status: 'error', progress: 0, message: '下载已取消' }
+}
+
+const formatDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 </script>
 
 <template>
@@ -120,6 +218,92 @@ onUnmounted(() => {
       <h2>关于</h2>
       <p>Melody Player v1.0.0</p>
       <p class="section-desc">一个简洁美观的本地音乐播放器</p>
+    </section>
+
+    <section class="settings-section animate-fade-in-up delay-400">
+      <h2>YouTube 音频下载</h2>
+      <p class="section-desc">输入 YouTube 视频链接，自动下载并转换为音频文件。视频名称作为音频名称，封面作为元数据。</p>
+      
+      <div class="youtube-form">
+        <div class="input-group">
+          <input
+            v-model="youtubeUrl"
+            type="text"
+            placeholder="输入 YouTube 视频链接..."
+            @blur="getVideoInfo"
+            @keyup.enter="getVideoInfo"
+            :disabled="isDownloading || !ytDlpAvailable"
+          />
+          <input
+            v-model="customAuthor"
+            type="text"
+            placeholder="自定义作者（可选）"
+            :disabled="isDownloading || !ytDlpAvailable"
+            class="author-input"
+          />
+        </div>
+
+        <!-- Video preview -->
+        <div v-if="videoPreview" class="video-preview">
+          <img 
+            v-if="videoPreview.thumbnail" 
+            :src="videoPreview.thumbnail" 
+            alt="Video thumbnail" 
+            class="video-thumbnail"
+          />
+          <div class="video-info">
+            <h3 class="video-title">{{ videoPreview.title }}</h3>
+            <p class="video-author">{{ videoPreview.author }}</p>
+            <p class="video-duration">{{ formatDuration(videoPreview.duration) }}</p>
+          </div>
+        </div>
+
+        <!-- Download progress -->
+        <div v-if="downloadProgress" class="download-progress">
+          <div class="progress-header">
+            <span class="progress-status">
+              {{ downloadProgress.status === 'downloading' ? '下载中...' :
+                 downloadProgress.status === 'converting' ? '转换中...' :
+                 downloadProgress.status === 'writing_metadata' ? '写入元数据...' :
+                 downloadProgress.status === 'completed' ? '完成！' : '错误' }}
+            </span>
+            <span v-if="downloadProgress.videoTitle" class="progress-title">{{ downloadProgress.videoTitle }}</span>
+          </div>
+          <div class="progress-bar">
+            <div 
+              class="progress-fill" 
+              :style="{ width: `${downloadProgress.progress}%` }"
+            ></div>
+          </div>
+          <p class="progress-message">{{ downloadProgress.message }}</p>
+        </div>
+
+        <div class="btn-group">
+          <button
+            class="download-btn"
+            @click="startDownload"
+            :disabled="isDownloading || !youtubeUrl || !ytDlpAvailable"
+          >
+            {{ isDownloading ? '下载中...' : '开始下载' }}
+          </button>
+          <button
+            v-if="isDownloading"
+            class="cancel-btn"
+            @click="cancelDownload"
+          >
+            取消
+          </button>
+        </div>
+
+        <p v-if="!ytDlpAvailable" class="warning-text">
+          ⚠️ yt-dlp 工具未安装。首次下载时会自动安装，请稍候。
+        </p>
+
+        <div class="download-dir-info">
+          <p class="dir-label">下载目录：</p>
+          <p class="dir-value">{{ youtubeDownloadDir }}</p>
+        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -315,5 +499,158 @@ onUnmounted(() => {
 
 .list-move {
   transition: transform 0.3s ease;
+}
+
+/* YouTube download styles */
+.youtube-form {
+  margin-top: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.input-group input {
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.input-group input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.author-input {
+  font-size: 13px;
+}
+
+.video-preview {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.video-thumbnail {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.video-info {
+  flex: 1;
+}
+
+.video-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.video-author {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.video-duration {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.download-progress {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-status {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.progress-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-message {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.download-btn {
+  padding: 14px 24px;
+  background: var(--accent);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.download-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.download-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  padding: 14px 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.cancel-btn:hover {
+  background: rgba(233, 69, 96, 0.2);
+}
+
+.warning-text {
+  font-size: 13px;
+  color: #f59e0b;
+  margin-top: 12px;
+}
+
+.download-dir-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.dir-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.dir-value {
+  font-size: 13px;
+  color: var(--text-primary);
 }
 </style>

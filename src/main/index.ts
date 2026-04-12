@@ -12,6 +12,7 @@ import { DesktopLyricsWindow } from './desktopLyrics'
 import { StatsManager } from './statsManager'
 import { MiniWindowManager } from './miniWindowManager'
 import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
+import { YouTubeDownloader } from './youtubeDownloader'
 
 let win: BrowserWindow | null = null
 const configManager = new ConfigManager()
@@ -24,6 +25,7 @@ const hotkeyManager = new HotkeyManager()
 const trayManager = new TrayManager()
 const statsManager = new StatsManager(musicLibrary)
 const miniWindowManager = new MiniWindowManager(win!)
+const youtubeDownloader = new YouTubeDownloader()
 let desktopLyrics: DesktopLyricsWindow | null = null
 
 function createWindow() {
@@ -47,6 +49,7 @@ function createWindow() {
   player.setWindow(win)
   syncManager.setWindow(win)
   deviceManager.setWindow(win)
+  youtubeDownloader.setWindow(win)
   
   // 重新初始化 miniWindowManager（传入窗口）
   miniWindowManager.mainWindow = win
@@ -484,4 +487,50 @@ ipcMain.handle('stats:analyzeSong', (_, song: any) => {
   const analysis = musicEmotionAnalyzer.analyzeEmotion(song)
   const scenes = musicEmotionAnalyzer.classifyScene(song, analysis)
   return { ...song, emotionAnalysis: analysis, sceneClassification: scenes }
+})
+
+// ===== YouTube 下载功能 =====
+ipcMain.handle('youtube:getVideoInfo', async (_, url: string) => {
+  try {
+    const info = await youtubeDownloader.getVideoInfo(url)
+    return { success: true, info }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('youtube:download', async (_, url: string, customAuthor?: string) => {
+  try {
+    const result = await youtubeDownloader.downloadAsAudio(url, customAuthor)
+    // Add to music library
+    const song = result.songInfo
+    musicLibrary.addSong(song)
+    playlistManager.setSongs(musicLibrary.getSongs())
+    // Notify frontend to update
+    win?.webContents.send('library:updated', musicLibrary.getSongs())
+    return { success: true, filePath: result.filePath, songInfo: song }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('youtube:cancelDownload', async () => {
+  return youtubeDownloader.cancelDownload()
+})
+
+ipcMain.handle('youtube:getDownloadDir', async () => {
+  return youtubeDownloader.getDownloadDir()
+})
+
+ipcMain.handle('youtube:setDownloadDir', async (_, dir: string) => {
+  youtubeDownloader.setDownloadDir(dir)
+  return true
+})
+
+ipcMain.handle('youtube:isValidUrl', async (_, url: string) => {
+  return youtubeDownloader.isValidYouTubeUrl(url)
+})
+
+ipcMain.handle('youtube:isAvailable', async () => {
+  return await youtubeDownloader.isYtDlpAvailable()
 })

@@ -379,6 +379,13 @@ export class MusicLibrary {
     return undefined
   }
 
+  addSong(song: Song): void {
+    this.songs.set(song.id, song)
+    this.addToAlbum(song)
+    this.addToArtist(song)
+    this.saveCache()
+  }
+
   clearCache(): void {
     try {
       if (existsSync(this.cachePath)) {

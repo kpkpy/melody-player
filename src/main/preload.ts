@@ -18,6 +18,13 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('library:scanProgress', handler)
       return () => ipcRenderer.removeListener('library:scanProgress', handler)
     },
+    onUpdated: (callback: (songs: any[]) => void) => {
+      const handler = (_event: IpcRendererEvent, songs: any[]) => {
+        callback(songs)
+      }
+      ipcRenderer.on('library:updated', handler)
+      return () => ipcRenderer.removeListener('library:updated', handler)
+    },
   },
 
   player: {
@@ -144,5 +151,23 @@ contextBridge.exposeInMainWorld('electron', {
     const handler = () => callback()
     ipcRenderer.on(`global:${type}`, handler)
     return () => ipcRenderer.removeListener(`global:${type}`, handler)
+  },
+
+  // YouTube 下载功能
+  youtube: {
+    getVideoInfo: (url: string) => ipcRenderer.invoke('youtube:getVideoInfo', url),
+    download: (url: string, customAuthor?: string) => ipcRenderer.invoke('youtube:download', url, customAuthor),
+    cancelDownload: () => ipcRenderer.invoke('youtube:cancelDownload'),
+    getDownloadDir: () => ipcRenderer.invoke('youtube:getDownloadDir'),
+    setDownloadDir: (dir: string) => ipcRenderer.invoke('youtube:setDownloadDir', dir),
+    isValidUrl: (url: string) => ipcRenderer.invoke('youtube:isValidUrl', url),
+    isAvailable: () => ipcRenderer.invoke('youtube:isAvailable'),
+    onDownloadProgress: (callback: (progress: { status: string; progress: number; message: string; videoTitle?: string }) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: { status: string; progress: number; message: string; videoTitle?: string }) => {
+        callback(progress)
+      }
+      ipcRenderer.on('youtube:downloadProgress', handler)
+      return () => ipcRenderer.removeListener('youtube:downloadProgress', handler)
+    },
   },
 })
