@@ -150,6 +150,7 @@ export class MusicLibrary {
     this.songs.clear()
     this.albums.clear()
     this.artists.clear()
+    this.songKeys.clear() // Clear deduplication keys for fresh scan
 
     const cachedSongs = forceRescan ? null : this.loadCache()
     const cachedMap = new Map<string, Song>()
