@@ -65,26 +65,15 @@ export class MusicLibrary {
     this.win = win
   }
 
-  // Generate deduplication key from title and artist
-  // When artist is unknown, use filePath to distinguish different files
-  // Also include album to allow same song from different albums
-  private getSongKey(title: string, artist: string, album: string, filePath?: string): string {
-    const normalizedTitle = title.toLowerCase().trim()
-    const normalizedArtist = artist.toLowerCase().trim()
-    const normalizedAlbum = album.toLowerCase().trim()
-    
-    // If artist is unknown, use file path to avoid false duplicates
-    if (normalizedArtist === 'unknown artist' && filePath) {
-      return filePath.toLowerCase()
-    }
-    
-    // Include album in key - same song from different albums should be kept
-    return `${normalizedTitle}|${normalizedArtist}|${normalizedAlbum}`
+  // Use filePath as unique identifier - no two files can be the same
+  // Title/artist deduplication is informational only
+  private getSongKey(filePath: string): string {
+    return filePath.toLowerCase()
   }
 
-  // Check if song with same title, artist and album already exists
-  isDuplicate(title: string, artist: string, album: string, filePath?: string): boolean {
-    const key = this.getSongKey(title, artist, album, filePath)
+  // Check if song with same filePath already exists
+  isDuplicate(filePath: string): boolean {
+    const key = this.getSongKey(filePath)
     return this.songKeys.has(key)
   }
 
@@ -138,8 +127,8 @@ export class MusicLibrary {
     for (let i = 0; i < cachedSongs.length; i++) {
       const song = cachedSongs[i]
       
-      // Check for duplicates while loading
-      const key = this.getSongKey(song.title, song.artist, song.album, song.filePath)
+      // Check for duplicates while loading - use filePath as unique key
+      const key = this.getSongKey(song.filePath)
       if (!this.songKeys.has(key)) {
         this.songs.set(song.id, song)
         this.songKeys.set(key, song.id)
@@ -156,12 +145,12 @@ export class MusicLibrary {
     return true
   }
 
-  async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: number; added: number; duplicates: number; errors: string[] }> {
+async scan(paths: string[], forceRescan: boolean = false): Promise<{ count: number; added: number; duplicates: number; parseErrors: number; errors: string[] }> {
     this.songs.clear()
     this.albums.clear()
     this.artists.clear()
-    this.songKeys.clear() // Clear deduplication keys for fresh scan
-
+    this.songKeys.clear()
+    
     const cachedSongs = forceRescan ? null : this.loadCache()
     const cachedMap = new Map<string, Song>()
     if (cachedSongs) {
@@ -173,7 +162,8 @@ export class MusicLibrary {
     const errors: string[] = []
     const allFiles: string[] = []
     const fileStats = new Map<string, number>()
-
+    let parseErrors = 0
+    
     for (const basePath of paths) {
       try {
         await this.scanDirectory(basePath, allFiles, fileStats)
@@ -181,10 +171,10 @@ export class MusicLibrary {
         errors.push(`Failed to scan ${basePath}: ${e.message || e}`)
       }
     }
-
+    
     const total = allFiles.length
     this.notifyProgress('parsing', 0, total, '')
-
+    
     let processed = 0
     const batchSize = 20
     
@@ -196,8 +186,7 @@ export class MusicLibrary {
         const cached = cachedMap.get(filePath)
         
         if (cached && cached.mtime && cached.mtime >= mtime) {
-          // Check for duplicates
-          const key = this.getSongKey(cached.title, cached.artist, cached.album, cached.filePath)
+          const key = this.getSongKey(cached.filePath)
           if (!this.songKeys.has(key)) {
             this.songs.set(cached.id, cached)
             this.songKeys.set(key, cached.id)
@@ -208,16 +197,16 @@ export class MusicLibrary {
           try {
             const metadata = await parseFile(filePath)
             const song = this.createSong(filePath, metadata, mtime)
-            // Check for duplicates
-            const key = this.getSongKey(song.title, song.artist, song.album, song.filePath)
+            const key = this.getSongKey(song.filePath)
             if (!this.songKeys.has(key)) {
               this.songs.set(song.id, song)
               this.songKeys.set(key, song.id)
               this.addToAlbum(song)
               this.addToArtist(song)
             }
-          } catch (e) {
-            // 忽略解析错误
+          } catch (e: any) {
+            parseErrors++
+            console.warn(`Parse error for ${filePath}: ${e.message}`)
           }
         }
       }))
@@ -225,12 +214,13 @@ export class MusicLibrary {
       processed += batch.length
       this.notifyProgress('parsing', processed, total, batch[batch.length - 1])
     }
-
+    
     this.saveCache()
     return { 
       count: allFiles.length, 
       added: this.songs.size,
-      duplicates: allFiles.length - this.songs.size - errors.length,
+      duplicates: allFiles.length - this.songs.size - parseErrors - errors.length,
+      parseErrors,
       errors 
     }
   }
@@ -426,8 +416,8 @@ export class MusicLibrary {
   }
 
   addSong(song: Song): boolean {
-    // Check for duplicates
-    const key = this.getSongKey(song.title, song.artist, song.album, song.filePath)
+    // Check for duplicates using filePath as unique identifier
+    const key = this.getSongKey(song.filePath)
     if (this.songKeys.has(key)) {
       return false // Duplicate, not added
     }
