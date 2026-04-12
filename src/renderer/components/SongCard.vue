@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 const props = defineProps<{
   song: any
@@ -9,17 +9,42 @@ defineEmits<{
   click: []
 }>()
 
+// Cache covers globally to avoid re-fetching
+const coverCache = new Map<string, string>()
+const loading = ref(false)
+
 const coverUrl = ref<string | undefined>(props.song.cover)
 
-// Load cover on demand if not already loaded
-onMounted(async () => {
-  if (!coverUrl.value && props.song.filePath) {
-    try {
-      coverUrl.value = await window.electron.library.getSongCover(props.song.filePath)
-    } catch (e) {
-      // Ignore errors
-    }
+// Load cover lazily with caching
+const loadCover = async () => {
+  if (coverUrl.value || loading.value) return
+  
+  const filePath = props.song.filePath
+  if (!filePath) return
+  
+  // Check cache first
+  if (coverCache.has(filePath)) {
+    coverUrl.value = coverCache.get(filePath)
+    return
   }
+  
+  loading.value = true
+  try {
+    const cover = await window.electron.library.getSongCover(filePath)
+    if (cover) {
+      coverCache.set(filePath, cover)
+      coverUrl.value = cover
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  loading.value = false
+}
+
+// Load cover when component mounts (lazy)
+onMounted(() => {
+  // Delay loading to avoid burst requests
+  setTimeout(loadCover, 100)
 })
 </script>
 

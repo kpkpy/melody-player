@@ -311,7 +311,7 @@ private createSong(filePath: string, metadata: any, mtime: number): Song {
       }
     }
 
-    return {
+return {
       id,
       title: common.title || this.getFileName(filePath),
       artist: common.artist || 'Unknown Artist',
@@ -323,6 +323,21 @@ private createSong(filePath: string, metadata: any, mtime: number): Song {
       lyrics,
       mtime,
     }
+  }
+
+  // Load cover on demand when displaying song - not cached in memory
+  async getSongCover(filePath: string): Promise<string | undefined> {
+    try {
+      const metadata = await parseFile(filePath)
+      const common = metadata.common
+      if (common.picture && common.picture.length > 0) {
+        const pic = common.picture[0]
+        return `data:${pic.format};base64,${pic.data.toString('base64')}`
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return undefined
   }
 
   // Load cover on demand when displaying song
