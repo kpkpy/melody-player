@@ -1,12 +1,91 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+
 const props = defineProps<{ song: any }>()
-defineEmits<{ click: [] }>()
+const emit = defineEmits<{ click: [] }>()
+
+const coverUrl = ref<string>('')
+const coverLoading = ref(false)
+const coverLoaded = ref(false)
+const coverError = ref(false)
+let coverObserver: IntersectionObserver | null = null
+const coverRef = ref<HTMLDivElement | null>(null)
+
+// Load cover image on demand
+const loadCover = async () => {
+  if (coverLoaded.value || coverLoading.value || coverError.value) return
+  
+  coverLoading.value = true
+  
+  try {
+    // First try from song.cover (if already loaded)
+    if (props.song.cover) {
+      coverUrl.value = props.song.cover
+      coverLoaded.value = true
+      return
+    }
+    
+    // Load cover from main process on demand
+    if (props.song.filePath && (window as any).electron?.library?.getSongCover) {
+      const coverDataUrl = await window.electron.library.getSongCover(props.song.filePath)
+      if (coverDataUrl) {
+        coverUrl.value = coverDataUrl
+        coverLoaded.value = true
+      } else {
+        coverError.value = true
+      }
+    } else {
+      coverError.value = true
+    }
+  } catch (e) {
+    console.error('Failed to load cover:', e)
+    coverError.value = true
+  } finally {
+    coverLoading.value = false
+  }
+}
+
+// Setup intersection observer for lazy loading
+onMounted(() => {
+  coverObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !coverLoaded.value) {
+          loadCover()
+          coverObserver?.unobserve(entry.target)
+        }
+      })
+    },
+    { rootMargin: '100px' }
+  )
+  
+  if (coverRef.value) {
+    coverObserver.observe(coverRef.value)
+  }
+})
+
+onUnmounted(() => {
+  coverObserver?.disconnect()
+})
 </script>
 
 <template>
-  <div class="song-card" @click="$emit('click')">
-    <div class="card-cover">
-      <div class="cover-placeholder">♪</div>
+  <div class="song-card" @click="emit('click')">
+    <div class="card-cover" ref="coverRef">
+      <!-- Loading state -->
+      <div v-if="coverLoading" class="cover-loading">
+        <div class="loading-spinner"></div>
+      </div>
+      
+      <!-- Cover image or placeholder -->
+      <div 
+        v-else-if="coverLoaded && coverUrl" 
+        class="cover-image"
+        :style="{ backgroundImage: `url(${coverUrl})` }"
+      ></div>
+      <div v-else class="cover-placeholder">♪</div>
+      
+      <!-- Play overlay -->
       <div class="play-overlay">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
           <path d="M8 5v14l11-7z" />
@@ -56,6 +135,38 @@ defineEmits<{ click: [] }>()
   overflow: hidden;
 }
 
+/* Loading spinner */
+.cover-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--bg-tertiary);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Cover image */
+.cover-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Placeholder */
 .cover-placeholder {
   font-size: 48px;
   color: var(--text-secondary);
