@@ -168,6 +168,7 @@ export const usePlayerStore = defineStore('player', () => {
     currentSong.value = song
     title.value = song.title
     artist.value = song.artist
+    // Use cover from song object if available, otherwise load it dynamically
     cover.value = song.cover || ''
     
     if (index !== undefined) {
@@ -175,6 +176,20 @@ export const usePlayerStore = defineStore('player', () => {
     } else if (playlist.value.length > 0) {
       const foundIndex = playlist.value.findIndex(s => s.id === song.id)
       currentIndex.value = foundIndex >= 0 ? foundIndex : -1
+    }
+    
+    // Load cover dynamically if not available (e.g., FLAC files)
+    if (!song.cover && song.filePath && (window as any).electron?.library?.getSongCover) {
+      try {
+        const coverDataUrl = await window.electron.library.getSongCover(song.filePath)
+        if (coverDataUrl) {
+          cover.value = coverDataUrl
+          // Update song object for future use
+          song.cover = coverDataUrl
+        }
+      } catch (e) {
+        console.error('Failed to load cover for', song.filePath, e)
+      }
     }
     
     if (song.audioUrl) {
