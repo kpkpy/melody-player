@@ -297,20 +297,34 @@ private createSong(filePath: string, metadata: any, mtime: number): Song {
     }
 }
 
-  // Load cover on demand when displaying song - not cached in memory
+// Load cover on demand when displaying song - not cached in memory
   async getSongCover(filePath: string): Promise<string | undefined> {
     try {
-      const metadata = await parseFile(filePath)
+      const metadata = await parseFile(filePath, { skipCovers: false })
       const common = metadata.common
       if (common.picture && common.picture.length > 0) {
         const pic = common.picture[0]
-        return `data:${pic.format};base64,${pic.data.toString('base64')}`
+        
+        // Normalize MIME type: handle cases where format is "JPEG", "PNG", etc.
+        let mime = pic.format || 'image/jpeg'
+        if (!mime.includes('/')) {
+          // Convert "JPEG" -> "image/jpeg", "PNG" -> "image/png"
+          mime = `image/${mime.toLowerCase()}`
+        }
+        
+        // Convert picture data to base64 properly
+        // pic.data may be Uint8Array, not Buffer
+        const coverBuffer = Buffer.isBuffer(pic.data) ? pic.data : Buffer.from(pic.data)
+        const coverBase64 = coverBuffer.toString('base64')
+        
+        return `data:${mime};base64,${coverBase64}`
       }
     } catch (e) {
       // Ignore parse errors
+      console.error('Failed to load cover from', filePath, e)
     }
     return undefined
-}
+  }
 
   private getFileName(filePath: string): string {
     const parts = filePath.split(/[/\\]/)
