@@ -50,8 +50,31 @@ onMounted(() => {
 
 const playSong = (song: any) => {
   const allSongs = musicStore.songs
+  
+  // Debug logging
+  console.log('[HomeView] Attempting to play song:', {
+    clickedSongId: song.id,
+    clickedSongTitle: song.title,
+    clickedSongFilePath: song.filePath,
+    totalSongsInLibrary: allSongs.length
+  })
+  
   const index = allSongs.findIndex(s => s.id === song.id)
-  playerStore.setPlaylist(allSongs, index >= 0 ? index : 0)
+  
+  console.log('[HomeView] Found song at index:', index, {
+    songAtIndex: index >= 0 ? allSongs[index] : null,
+    songsAtIndexMinus1: index > 0 ? allSongs[index - 1] : null,
+    songsAtIndexPlus1: index < allSongs.length - 1 ? allSongs[index + 1] : null
+  })
+  
+  if (index === -1) {
+    console.error('[HomeView] Song not found in allSongs!', song)
+    return
+  }
+  
+  playerStore.setPlaylist(allSongs, index)
+  
+  console.log('[HomeView] setPlaylist called with index:', index)
 }
 </script>
 
