@@ -12,6 +12,7 @@ const navItems = [
   { path: '/emotion', icon: '🎭', label: '情绪' },
   { path: '/stats', icon: '📊', label: '统计' },
   { path: '/sync', icon: '🔄', label: '同步' },
+  { path: '/ncm-converter', icon: '🎵', label: 'NCM 转换' },
   { path: '/settings', icon: '⚙️', label: '设置' },
 ]
 

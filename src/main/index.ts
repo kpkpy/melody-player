@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol } from 'electron'
 import { join, resolve } from 'path'
+import { readFileSync } from 'fs'
 import { MusicLibrary } from './musicLibrary'
 import { Player } from './player'
 import { PlaylistManager } from './playlistManager'
@@ -13,6 +14,7 @@ import { StatsManager } from './statsManager'
 import { MiniWindowManager } from './miniWindowManager'
 import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
 import { YouTubeDownloader } from './youtubeDownloader'
+import { NcmConverter } from './ncmConverter'
 import { initDatabase, getSongCover } from './database'
 
 let win: BrowserWindow | null = null
@@ -27,6 +29,7 @@ const trayManager = new TrayManager()
 const statsManager = new StatsManager(musicLibrary)
 const miniWindowManager = new MiniWindowManager(win!)
 const youtubeDownloader = new YouTubeDownloader()
+const ncmConverter = new NcmConverter()
 let desktopLyrics: DesktopLyricsWindow | null = null
 
 function createWindow() {
@@ -196,6 +199,27 @@ ipcMain.handle('library:getSongCover', async (_, filePath: string) => {
     return await getSongCover(filePath)
   } catch (e) {
     return undefined
+  }
+})
+
+// NCM 格式转换
+ipcMain.handle('ncm:convert', async (_, filePath: string, outputDir?: string) => {
+  return await ncmConverter.convert(filePath, outputDir)
+})
+
+ipcMain.handle('ncm:batchConvert', async (_, filePaths: string[], outputDir: string, maxConcurrent?: number) => {
+  return await ncmConverter.batchConvert(filePaths, outputDir, maxConcurrent)
+})
+
+ipcMain.handle('ncm:scanDirectory', async (_, dirPath: string) => {
+  try {
+    const { readdirSync } = await import('fs')
+    const files = readdirSync(dirPath)
+      .filter(f => f.toLowerCase().endsWith('.ncm'))
+      .map(f => join(dirPath, f))
+    return { success: true, files }
+  } catch (e) {
+    return { success: false, error: (e as Error).message, files: [] }
   }
 })
 

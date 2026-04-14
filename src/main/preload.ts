@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld('electron', {
     delete: (playlistId: string) => ipcRenderer.invoke('playlist:delete', playlistId),
   },
 
+  ncm: {
+    convert: (filePath: string, outputDir?: string) => 
+      ipcRenderer.invoke('ncm:convert', filePath, outputDir),
+    batchConvert: (filePaths: string[], outputDir: string, maxConcurrent?: number) => 
+      ipcRenderer.invoke('ncm:batchConvert', filePaths, outputDir, maxConcurrent),
+    scanDirectory: (dirPath: string) => 
+      ipcRenderer.invoke('ncm:scanDirectory', dirPath),
+  },
+
   sync: {
     exportPlaylist: (playlistId: string) => ipcRenderer.invoke('sync:exportPlaylist', playlistId),
     importM3U: () => ipcRenderer.invoke('sync:importM3U'),

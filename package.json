@@ -20,7 +20,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "music-metadata": "^11.12.3",
+    "mutagen": "^1.0.0",
     "pinia": "^2.1.0",
     "vue": "^3.4.0",
     "vue-router": "^4.2.0"

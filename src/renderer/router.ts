@@ -6,6 +6,7 @@ import SettingsView from '@/views/SettingsView.vue'
 import SyncView from '@/views/SyncView.vue'
 import StatsView from '@/views/StatsView.vue'
 import EmotionView from '@/views/EmotionView.vue'
+import NcmConverterView from '@/views/NcmConverterView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/emotion', name: 'emotion', component: EmotionView },
     { path: '/stats', name: 'stats', component: StatsView },
     { path: '/sync', name: 'sync', component: SyncView },
+    { path: '/ncm-converter', name: 'ncm-converter', component: NcmConverterView },
     { path: '/settings', name: 'settings', component: SettingsView },
   ],
 })
