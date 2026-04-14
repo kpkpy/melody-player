@@ -2,7 +2,17 @@
   "name": "melody-player",
   "version": "1.0.0",
   "description": "Apple Music style local music player",
+  "author": "kpkpy",
   "main": "dist-electron/main/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kpkpy/melody-player.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kpkpy/melody-player/issues"
+  },
+  "homepage": "https://github.com/kpkpy/melody-player#readme",
   "scripts": {
     "dev": "vite",
     "build": "vite build && electron-builder",
