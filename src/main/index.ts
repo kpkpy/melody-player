@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, protocol } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { MusicLibrary } from './musicLibrary'
 import { Player } from './player'
 import { PlaylistManager } from './playlistManager'
@@ -69,7 +69,14 @@ function createWindow() {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools()
   } else {
-    win.loadFile(join(__dirname, '../dist/index.html'))
+    // In production, load from ASAR or unpacked resources
+    const appPath = app.getAppPath()
+    const indexPath = process.env.NODE_ENV === 'development' 
+      ? join(__dirname, '../dist/index.html')
+      : appPath.endsWith('app.asar')
+        ? join(appPath, '..', 'app.asar', 'dist', 'index.html')
+        : join(appPath, 'dist', 'index.html')
+    win.loadFile(indexPath)
   }
 }
 
