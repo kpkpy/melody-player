@@ -18,7 +18,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
 
   const createPlaylist = async (name: string) => {
     const playlist = await window.electron.playlist.create(name)
-    playlists.value.push(playlist)
+    await loadPlaylists()
     return playlist
   }
 
