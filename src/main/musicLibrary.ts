@@ -6,6 +6,29 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 
 const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.m4a', '.wav', '.ogg', '.wma', '.ape', '.aac']
 
+export interface AudioFeatures {
+  bpm: number
+  tempoConfidence: number
+  energy: number
+  rmsEnergy: number
+  dynamicRange: number
+  spectralCentroid: number
+  spectralFlatness: number
+  spectralRolloff: number
+  zeroCrossingRate: number
+  key: string
+  mode: 'major' | 'minor' | 'unknown'
+  keyStrength: number
+  danceability: number
+  valence: number
+  acousticness: number
+  instrumentalness: number
+  speechiness: number
+  loudness: number
+  loudnessRange: number
+  featuresSource: 'audio' | 'metadata' | 'estimated'
+}
+
 export interface Song {
   id: string
   title: string
@@ -17,6 +40,11 @@ export interface Song {
   cover?: string
   lyrics?: string
   mtime?: number
+  genre?: string
+  audioFeatures?: AudioFeatures
+  emotionAnalysis?: any
+  sceneClassification?: any
+  emotionTags?: string[]
 }
 
 export interface Album {

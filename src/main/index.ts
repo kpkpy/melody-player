@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol } from 'electron'
 import { join, resolve } from 'path'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync } from 'fs'
 import { MusicLibrary } from './musicLibrary'
 import { Player } from './player'
 import { PlaylistManager } from './playlistManager'
@@ -16,6 +16,44 @@ import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
 import { YouTubeDownloader } from './youtubeDownloader'
 import { NcmConverter } from './ncmConverter'
 import { initDatabase, getSongCover } from './database'
+
+// ===== 防止 EPIPE: broken pipe 导致主进程崩溃 =====
+// 当渲染进程崩溃时，console.log 写入断裂管道会抛出 EPIPE 错误
+// 必须尽早注册，在任何 console.log 之前
+const originalStdoutWrite = process.stdout.write.bind(process.stdout)
+const originalStderrWrite = process.stderr.write.bind(process.stderr)
+
+process.stdout.write = (chunk: any, ...args: any[]) => {
+  try {
+    return originalStdoutWrite(chunk, ...args)
+  } catch (e: any) {
+    if (e.code === 'EPIPE') return true
+    throw e
+  }
+}
+
+process.stderr.write = (chunk: any, ...args: any[]) => {
+  try {
+    return originalStderrWrite(chunk, ...args)
+  } catch (e: any) {
+    if (e.code === 'EPIPE') return true
+    throw e
+  }
+}
+
+// 捕获未处理的异常，防止应用崩溃
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EPIPE') return
+  try {
+    const logPath = join(app.getPath('userData'), 'main-error.log')
+    appendFileSync(logPath, `[${new Date().toISOString()}] ${err.stack}\n`)
+  } catch (e) { /* ignore */ }
+})
+
+process.on('unhandledRejection', (reason) => {
+  // 静默处理 Promise rejection
+})
+// ===== EPIPE 防护结束 =====
 
 let win: BrowserWindow | null = null
 const configManager = new ConfigManager()
@@ -286,6 +324,14 @@ ipcMain.handle('window:maximize', async () => {
 
 ipcMain.handle('window:close', async () => {
   win?.close()
+})
+
+ipcMain.handle('window:move', async (_, x: number, y: number) => {
+  win?.setPosition(Math.round(x), Math.round(y))
+})
+
+ipcMain.handle('window:getPosition', async () => {
+  return win?.getPosition() || [0, 0]
 })
 
 // 配置相关
@@ -581,4 +627,60 @@ ipcMain.handle('youtube:isValidUrl', async (_, url: string) => {
 
 ipcMain.handle('youtube:isAvailable', async () => {
   return await youtubeDownloader.isYtDlpAvailable()
+})
+
+// ===== 音频特征分析 =====
+ipcMain.handle('audioFeatures:loadAudioFile', async (_, filePath: string) => {
+  try {
+    const fs = await import('fs/promises')
+    const buffer = await fs.readFile(filePath)
+    // Transfer as ArrayBuffer to renderer
+    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  } catch (e: any) {
+    console.error('Audio file read error:', e)
+    return null
+  }
+})
+
+ipcMain.handle('audioFeatures:storeFeatures', async (_, songId: string, features: any) => {
+  try {
+    // 存储歌曲的音频特征到音乐库
+    const song = musicLibrary.getSongById(songId)
+    if (song) {
+      (song as any).audioFeatures = features
+      // 触发重新分析（使用真实音频特征）
+      const { musicEmotionAnalyzer } = await import('./musicEmotionAnalyzer')
+      const analysis = musicEmotionAnalyzer.analyzeEmotion(song, features)
+      const scenes = musicEmotionAnalyzer.classifyScene(song, analysis)
+      
+      ;(song as any).emotionAnalysis = analysis
+      ;(song as any).sceneClassification = scenes
+      ;(song as any).emotionTags = [
+        analysis.primaryTone,
+        ...analysis.secondaryTones,
+        ...scenes.scenes.map((s: any) => s.scene),
+      ]
+      
+      // 更新 stats
+      statsManager.updateSongEmotion(songId, (song as any).emotionTags)
+      
+      return { success: true, analysis }
+    }
+    return { success: false, error: 'Song not found' }
+  } catch (e: any) {
+    console.error('Audio features store error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+ipcMain.handle('audioFeatures:batchAnalyze', async () => {
+  try {
+    // 通知渲染进程开始批量分析
+    // 实际分析在渲染进程进行（需要 Web Audio API）
+    win?.webContents.send('audioFeatures:startBatchAnalyze')
+    return { success: true, message: 'Batch analysis started' }
+  } catch (e: any) {
+    console.error('Batch analyze error:', e)
+    return { success: false, error: e.message }
+  }
 })

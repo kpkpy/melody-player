@@ -106,6 +106,8 @@ contextBridge.exposeInMainWorld('electron', {
     toggleMini: () => ipcRenderer.invoke('window:toggleMini'),
     isMini: () => ipcRenderer.invoke('window:isMini'),
     togglePiP: () => ipcRenderer.invoke('window:togglePiP'),
+    move: (x: number, y: number) => ipcRenderer.invoke('window:move', x, y),
+    getPosition: () => ipcRenderer.invoke('window:getPosition'),
     onMiniModeChanged: (callback: (isMini: boolean) => void) => {
       const handler = (_event: any, isMini: boolean) => callback(isMini)
       ipcRenderer.on('window:miniModeChanged', handler)
@@ -131,6 +133,16 @@ contextBridge.exposeInMainWorld('electron', {
     hide: () => ipcRenderer.invoke('desktopLyrics:hide'),
     toggle: () => ipcRenderer.invoke('desktopLyrics:toggle'),
     update: (lines: string[], currentIndex: number) => ipcRenderer.invoke('desktopLyrics:update', lines, currentIndex),
+  },
+
+  // 情绪分析相关
+  audioFeatures: {
+    // 存储歌曲的音频特征（renderer 分析完成后调用）
+    storeFeatures: (songId: string, features: any) => ipcRenderer.invoke('audioFeatures:storeFeatures', songId, features),
+    // 重分析所有歌曲（包括音频特征提取）
+    batchAnalyze: () => ipcRenderer.invoke('audioFeatures:batchAnalyze'),
+    // 从主进程读取音频文件数据
+    loadAudioFile: (filePath: string) => ipcRenderer.invoke('audioFeatures:loadAudioFile', filePath),
   },
 
   stats: {

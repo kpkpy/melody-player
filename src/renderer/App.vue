@@ -12,6 +12,14 @@ const playerStore = usePlayerStore()
 const isAppReady = ref(false)
 const showContent = ref(false)
 const loadingText = ref('正在初始化...')
+const isMiniMode = ref(false)
+
+// 监听迷你模式变化
+if ((window as any).electron?.window) {
+  window.electron.window.onMiniModeChanged((mini: boolean) => {
+    isMiniMode.value = mini
+  })
+}
 
 onMounted(async () => {
   loadingText.value = '加载音乐库...'
@@ -66,9 +74,9 @@ onMounted(async () => {
   </Transition>
 
   <Transition name="app-enter">
-    <div v-if="showContent" class="app-container">
-      <TitleBar />
-      <div class="main-content">
+    <div v-if="showContent" class="app-container" :class="{ 'mini-mode': isMiniMode }">
+      <TitleBar v-if="!isMiniMode" />
+      <div class="main-content" v-if="!isMiniMode">
         <Sidebar />
         <main class="content-area">
           <router-view v-slot="{ Component, route }">

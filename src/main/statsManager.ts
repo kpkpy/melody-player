@@ -471,9 +471,18 @@ export class StatsManager {
       .sort((a, b) => b.count - a.count)
   }
 
+  // 更新歌曲情绪标签（用于音频特征分析后）
+  updateSongEmotion(songId: string, emotionTags: string[]): void {
+    const songStats = this.stats.songs.get(songId)
+    if (songStats) {
+      songStats.emotionTags = emotionTags
+    }
+    this.saveStats()
+  }
+
   // 重新分析所有歌曲情绪
   reanalyzeAllEmotions(): void {
-    console.log('[StatsManager.reanalyzeAllEmotions] 开始分析...')
+    console.log('[StatsManager.reanalyzeAllEmotions] 开始分析... (12Tones 体系)')
     console.log('[StatsManager.reanalyzeAllEmotions] musicLibrary:', this.musicLibrary ? '已设置' : '未设置')
     
     if (!this.musicLibrary) {
@@ -483,36 +492,46 @@ export class StatsManager {
     }
     
     const songs = this.musicLibrary.getSongs()
-    console.log('[StatsManager.reanalyzeAllEmotions] 从 musicLibrary 获取歌曲数量:', songs.length)
+    console.log('[StatsManager.reanalyzeAllEmotions] 从 musicLibrary 获取歌曲数量:', songs?.length ?? 0)
     
     if (!songs || songs.length === 0) {
       console.warn('[StatsManager.reanalyzeAllEmotions] 音乐库为空，无法分析')
       return
     }
     
-    console.log(`[StatsManager.reanalyzeAllEmotions] 开始分析 ${songs.length} 首歌曲...`)
+    console.log(`[StatsManager.reanalyzeAllEmotions] 开始分析 ${songs.length} 首歌曲 (12Tones)...`)
     
     let analyzedCount = 0
-    songs.forEach((song, index) => {
+    for (let index = 0; index < songs.length; index++) {
+      const song = songs[index]
       try {
         console.log(`[StatsManager.reanalyzeAllEmotions] 分析第 ${index + 1}/${songs.length} 首：${song.title || song.filePath}`)
         
-        const analysis = musicEmotionAnalyzer.analyzeEmotion(song)
+        // 分析音频特征（如果已有）
+        const audioFeatures = song.audioFeatures
+        
+        // 12Tones 情绪分析
+        const analysis = musicEmotionAnalyzer.analyzeEmotion(song, audioFeatures)
         const scenes = musicEmotionAnalyzer.classifyScene(song, analysis)
         
-        // 更新歌曲对象
+        // 更新歌曲对象 - 使用 12Tones
         song.emotionAnalysis = analysis
         song.sceneClassification = scenes
-        song.emotionTags = [analysis.primaryEmotion, ...analysis.secondaryEmotions, ...scenes.scenes]
+        song.emotionTags = [
+          analysis.primaryTone,
+          ...(analysis.secondaryTones || []),
+          ...(scenes.scenes || []).map((s: any) => s.scene),
+        ]
         
-        console.log(`[StatsManager.reanalyzeAllEmotions] 第 ${index + 1} 首分析完成：`, analysis.primaryEmotion)
+        console.log(`[StatsManager.reanalyzeAllEmotions] 第 ${index + 1} 首分析完成：`, 
+          analysis.primaryTone, `(mood: ${analysis.moodScore?.toFixed(2) ?? 'N/A'}, tempo: ${analysis.tempoScore?.toFixed(2) ?? 'N/A'})`)
         
-        // 同步到 stats.songs（关键！）
+        // 同步到 stats.songs
         if (!this.stats.songs.has(song.id)) {
           this.stats.songs.set(song.id, {
             id: song.id,
-            title: song.title,
-            artist: song.artist,
+            title: song.title || 'Unknown',
+            artist: song.artist || 'Unknown',
             album: song.album || '',
             playCount: 0,
             totalPlayTime: 0,
@@ -523,9 +542,10 @@ export class StatsManager {
             emotionTags: song.emotionTags || [],
           })
         } else {
-          // 更新现有统计
-          const songStats = this.stats.songs.get(song.id)!
-          songStats.emotionTags = song.emotionTags || []
+          const songStats = this.stats.songs.get(song.id)
+          if (songStats) {
+            songStats.emotionTags = song.emotionTags || []
+          }
         }
         
         analyzedCount++
@@ -535,7 +555,7 @@ export class StatsManager {
       } catch (e) {
         console.error(`[StatsManager.reanalyzeAllEmotions] 分析歌曲失败 ${song.title || `#${index}`}:`, e)
       }
-    })
+    }
     
     console.log(`[StatsManager.reanalyzeAllEmotions] 分析完成！分析了 ${analyzedCount} 首歌曲`)
     console.log(`[StatsManager.reanalyzeAllEmotions] stats.songs 现在包含：${this.stats.songs.size} 首歌曲`)

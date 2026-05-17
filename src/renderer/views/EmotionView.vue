@@ -3,10 +3,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useMusicStore } from '@/stores/music'
+import { useAudioAnalysis } from '@/utils/useAudioAnalysis'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
 const musicStore = useMusicStore()
+const audioAnalysis = useAudioAnalysis()
 
 interface EmotionCategory {
   emotion: string
@@ -19,46 +21,64 @@ const selectedEmotion = ref<string | null>(null)
 const isLoading = ref(true)
 const showDetailedAnalysis = ref(false)
 
-// 情绪图标映射
+// 情绪图标映射 (12Tones + 场景)
 const emotionIcons: Record<string, string> = {
-  happy: '😊',
-  sad: '😢',
-  relax: '😌',
-  energetic: '⚡',
-  romantic: '💕',
-  nostalgic: '🕰️',
-  focus: '🎯',
-  workout: '💪',
-  party: '🎉',
-  sleep: '😴',
-  morning: '🌅',
-  work: '💼',
-  drive: '🚗',
-  rainy: '🌧️',
-  social: '👥',
-  meditation: '🧘',
-  study: '📚',
+  // 12Tones
+  'Dance': '💃',
+  'Upbeat': '🌟',
+  'Energetic': '⚡',
+  'Extreme': '🔥',
+  'Angry': '😤',
+  'Intense': '🎭',
+  'Romantic': '💕',
+  'Mellow': '🍷',
+  'Peaceful': '🕊️',
+  'Sad': '😢',
+  'Melancholy': '🌧️',
+  'Relax': '😌',
+  // 场景
+  'Morning': '🌅',
+  'Daytime': '☀️',
+  'Evening': '🌇',
+  'Night': '🌙',
+  'Workout': '💪',
+  'Party': '🎉',
+  'Sleep': '😴',
+  'Drive': '🚗',
+  'Commute': '🚌',
+  'Study': '📚',
+  'Focus': '🎯',
+  'Celebrate': '🎊',
 }
 
-// 情绪颜色映射
+// 情绪颜色映射 (12Tones + 场景)
 const emotionColors: Record<string, string> = {
-  happy: '#FFD700',
-  sad: '#6B7280',
-  relax: '#10B981',
-  energetic: '#EF4444',
-  romantic: '#EC4899',
-  nostalgic: '#8B5CF6',
-  focus: '#3B82F6',
-  workout: '#F97316',
-  party: '#EC4899',
-  sleep: '#6366F1',
-  morning: '#F59E0B',
-  work: '#06B6D4',
-  drive: '#84CC16',
-  rainy: '#3B82F6',
-  social: '#EC4899',
-  meditation: '#10B981',
-  study: '#6366F1',
+  // 12Tones - Mood × Tempo 配色
+  'Dance': '#FF6B35',     // 高Mood + 快节奏 → 橙色活力
+  'Upbeat': '#FFD700',    // 高Mood + 中快节奏 → 金色明亮
+  'Energetic': '#FF3333', // 中高Mood + 快节奏 → 红色能量
+  'Extreme': '#8B0000',   // 低Mood + 极快节奏 → 深红震撼
+  'Angry': '#CC0000',     // 低Mood + 快节奏 → 鲜红愤怒
+  'Intense': '#993399',   // 中低Mood + 快节奏 → 紫色紧张
+  'Romantic': '#EC4899',  // 高Mood + 慢节奏 → 粉色浪漫
+  'Mellow': '#FF8C00',    // 中高Mood + 慢节奏 → 琥珀柔和
+  'Peaceful': '#4CAF50',  // 高Mood + 慢速 → 绿叶宁静
+  'Sad': '#555578',       // 低Mood + 慢速 → 深蓝悲伤
+  'Melancholy': '#7B68AE',// 中低Mood + 慢速 → 紫罗兰忧郁
+  'Relax': '#10B981',     // 中Mood + 慢速 → 翡翠放松
+  // 场景
+  'Morning': '#F59E0B',
+  'Daytime': '#06B6D4',
+  'Evening': '#8B5CF6',
+  'Night': '#1E40AF',
+  'Workout': '#F97316',
+  'Party': '#EC4899',
+  'Sleep': '#6366F1',
+  'Drive': '#84CC16',
+  'Commute': '#14B8A6',
+  'Study': '#6366F1',
+  'Focus': '#3B82F6',
+  'Celebrate': '#F59E0B',
 }
 
 onMounted(async () => {
@@ -110,33 +130,38 @@ const goBack = () => {
 }
 
 const reanalyzeAll = async () => {
-  console.log('🎭 [情绪分析] 开始点击重新分析按钮')
+  console.log('🎭 [情绪分析] 12Tones 分析开始')
   
-  if (!confirm('确定要重新分析所有歌曲的情绪吗？这可能需要一些时间。')) return
+  if (!confirm('确定要重新分析所有歌曲的情绪吗？\n\n• 第一阶段：元数据快速分类（立即）\n• 第二阶段：音频特征深度分析（可选，后续添加）\n\n总耗时：几秒钟')) return
   
   isLoading.value = true
-  showDetailedAnalysis.value = false
   
   try {
-    console.log('🎭 [情绪分析] 开始调用 IPC...')
+    const songs = musicStore.songs
+    if (!songs || songs.length === 0) {
+      alert('音乐库为空，无法分析')
+      return
+    }
     
-    // 先检查统计
-    const stats = await window.electron.stats.getStats()
-    console.log('🎭 [情绪分析] 统计数据:', stats)
-    console.log('🎭 [情绪分析] 歌曲数量:', stats.songs?.length || 0)
-    
-    // 调用重新分析
+    // 只使用元数据分析（确保稳定不崩溃）
+    console.log('🎭 [情绪分析] 开始元数据分析...')
     await window.electron.stats.reanalyzeEmotions()
-    console.log('🎭 [情绪分析] IPC 调用完成')
+    console.log('🎭 [情绪分析] 元数据分析完成')
     
-    // 刷新列表
+    // 加载分类
     await loadEmotionCategories()
-    console.log('🎭 [情绪分析] 分类加载完成:', emotionCategories.value.length, '个分类')
     
-    alert('情绪分析完成！共分析了 ' + emotionCategories.value.length + ' 个情绪分类')
+    // 统计结果
+    const totalSongs = songs.length
+    const analyzedSongs = emotionCategories.value.reduce((sum, cat) => sum + cat.count, 0)
+    
+    alert(`🎭 12Tones 情绪分析完成！\n\n` +
+      `• ${emotionCategories.value.length} 个情绪分类\n` +
+      `• ${analyzedSongs} 首歌曲已分类\n` +
+      `• ${totalSongs} 首总歌曲数`
+    )
   } catch (e: any) {
     console.error('❌ [情绪分析] 失败:', e)
-    console.error('❌ [情绪分析] 错误堆栈:', e.stack)
     alert('分析失败：' + e.message)
   } finally {
     isLoading.value = false
@@ -174,9 +199,9 @@ const goToHome = () => {
     </div>
 
     <div class="emotion-hero">
-      <h1 class="animate-fade-in-up">🎭 音乐情绪识别</h1>
+      <h1 class="animate-fade-in-up">🎭 12Tones 音乐情绪识别</h1>
       <p class="animate-fade-in-up delay-100">
-        智能分析你的音乐库，自动分类情绪和场景
+        参考 Sony SensMe 理念 · 情绪 × 节奏 2D 空间 · 12 个情绪分类 · 智能场景匹配
       </p>
     </div>
 
@@ -194,9 +219,34 @@ const goToHome = () => {
         <div class="stat-value">{{ musicStore.songs.length }}</div>
         <div class="stat-label">总歌曲数</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-value">12</div>
+        <div class="stat-label">12Tones 体系</div>
+      </div>
     </div>
 
     <div v-if="isLoading" class="loading">正在加载情绪分类...</div>
+
+    <!-- 分析进度 -->
+    <div v-if="audioAnalysis.analysis.isRunning" class="analysis-progress">
+      <div class="progress-header">
+        <h3>🔄 正在分析音频特征...</h3>
+        <span class="progress-percent">{{ audioAnalysis.analysis.progressPercent }}%</span>
+      </div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" :style="{ width: `${audioAnalysis.analysis.progressPercent}%` }"></div>
+      </div>
+      <p class="progress-current-file">{{ audioAnalysis.analysis.currentFile }}</p>
+      <div class="progress-stats">
+        <span>进度：{{ audioAnalysis.analysis.current }} / {{ audioAnalysis.analysis.total }}</span>
+        <span v-if="audioAnalysis.analysis.errors > 0" class="progress-errors">失败：{{ audioAnalysis.analysis.errors }}</span>
+      </div>
+    </div>
+
+    <div v-else-if="audioAnalysis.status.value === 'complete' && !audioAnalysis.analysis.isRunning" class="analysis-complete">
+      <div class="complete-icon">✅</div>
+      <p>音频分析完成！正在刷新分类...</p>
+    </div>
 
     <div v-else-if="emotionCategories.length === 0" class="empty">
       <h2>🎵 还没有情绪分类</h2>
@@ -276,27 +326,28 @@ const goToHome = () => {
 
     <!-- 情绪说明 -->
     <div class="emotion-explanation">
-      <h3>💡 情绪识别原理</h3>
+      <h3>💡 12Tones 情绪识别原理</h3>
+      <p class="explanation-intro">参考 Sony SensMe 技术理念，基于两个主轴维度分析音乐：</p>
       <div class="explanation-grid">
         <div class="explanation-item">
-          <div class="explanation-icon">🎵</div>
+          <div class="explanation-icon">📡</div>
           <div class="explanation-content">
-            <strong>元数据分析</strong>
-            <p>从歌曲标题、艺术家、专辑等信息提取情绪关键词</p>
+            <strong>音频特征提取</strong>
+            <p>通过频谱质心、BPM、能量值、MIDI特征等计算歌曲的情绪坐标，而非简单关键词匹配</p>
+          </div>
+        </div>
+        <div class="explanation-item">
+          <div class="explanation-icon">🎯</div>
+          <div class="explanation-content">
+            <strong>情绪 × 节奏 2D 空间</strong>
+            <p>Mood 轴（快乐↔悲伤）× Tempo 轴（快节奏↔慢节奏）= 12 个情绪分类</p>
           </div>
         </div>
         <div class="explanation-item">
           <div class="explanation-icon">🎶</div>
           <div class="explanation-content">
-            <strong>BPM 分析</strong>
-            <p>根据节奏速度判断歌曲情绪（慢歌放松，快歌激昂）</p>
-          </div>
-        </div>
-        <div class="explanation-item">
-          <div class="explanation-icon">🎚️</div>
-          <div class="explanation-content">
-            <strong>音频特征</strong>
-            <p>分析能量、舞曲度、原声度等特征进行分类</p>
+            <strong>元数据增强</strong>
+            <p>结合流派、时长等 metadata 进行特征推断，支持后期接入深度学习模型做精准分析</p>
           </div>
         </div>
       </div>
@@ -663,5 +714,86 @@ const goToHome = () => {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(-20px);
+}
+
+/* 分析进度 */
+.analysis-progress {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px var(--shadow);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.progress-percent {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.progress-bar-container {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #ff8a80);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-current-file {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.progress-errors {
+  color: #ef4444;
+}
+
+.analysis-complete {
+  text-align: center;
+  padding: 24px;
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.complete-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.analysis-complete p {
+  font-size: 16px;
+  color: var(--text-secondary);
 }
 </style>

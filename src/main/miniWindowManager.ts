@@ -60,7 +60,7 @@ export class MiniWindowManager {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
 
     // 设置迷你窗口尺寸
-    const miniWidth = 300
+    const miniWidth = 320
     const miniHeight = 80
 
     // 移动到右上角
@@ -75,6 +75,7 @@ export class MiniWindowManager {
     this.mainWindow.setAlwaysOnTop(true, 'floating')
     this.mainWindow.setVisibleOnAllWorkspaces(true)
     this.mainWindow.setSkipTaskbar(true)
+    this.mainWindow.setMinimumSize(miniWidth, miniHeight)
 
     this.isMiniMode = true
     this.mainWindow.webContents.send('window:miniModeChanged', true)

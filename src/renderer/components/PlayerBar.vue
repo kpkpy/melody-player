@@ -22,6 +22,30 @@ if ((window as any).electron?.window) {
   })
 }
 
+// 迷你模式拖动支持
+const handleDragStart = async (e: MouseEvent) => {
+  if (!isMiniMode.value) return
+  const target = e.target as HTMLElement
+  if (target.closest('button, a, input, [class*="btn"], [class*="progress"], [class*="volume"], [class*="window-controls"], [class*="queue"], [class*="mode"], [class*="lyrics"], [class*="vinyl"]')) return
+
+  e.preventDefault()
+  const [startX, startY] = await (window as any).electron.window.getPosition()
+  
+  const onMouseMove = async (moveEvent: MouseEvent) => {
+    const newX = startX + (moveEvent.screenX - e.screenX)
+    const newY = startY + (moveEvent.screenY - e.screenY)
+    await (window as any).electron.window.move(newX, newY)
+  }
+  
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
+
 const progress = computed(() => {
   if (playerStore.duration === 0) return 0
   return (playerStore.currentTime / playerStore.duration) * 100
@@ -68,6 +92,7 @@ const togglePiPMode = () => {
 }
 
 const togglePanel = () => {
+  if (isMiniMode.value) return
   isPanelOpen.value = !isPanelOpen.value
   if (isPanelOpen.value && audioContext) {
     connectAnalyser()
@@ -686,30 +711,64 @@ onUnmounted(() => {
 
         <!-- 底部控制 -->
         <div class="panel-controls">
-          <button class="ctrl-btn-lg" @click="playerStore.previous">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-            </svg>
-          </button>
-          <button class="play-btn-lg" @click="playerStore.togglePlay">
-            <svg v-if="!playerStore.isPlaying" width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            <svg v-else width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-            </svg>
-          </button>
-          <button class="ctrl-btn-lg" @click="playerStore.next">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-            </svg>
-          </button>
+          <!-- 左侧控制 -->
+          <div class="panel-controls-left">
+            <button class="ctrl-btn-sm" :class="{ active: playerStore.playMode !== 'sequence' }" @click="playerStore.togglePlayMode" :title="playModeTitle">
+              <svg v-if="playerStore.playMode === 'sequence'" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+              </svg>
+              <svg v-else-if="playerStore.playMode === 'random'" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+                <text x="12" y="14" font-size="8" text-anchor="middle" fill="currentColor">1</text>
+              </svg>
+            </button>
+            <button class="ctrl-btn-sm" @click="playerStore.showQueue = !playerStore.showQueue" title="播放队列">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+              </svg>
+              <span v-if="playerStore.queue.length > 0" class="panel-queue-badge">{{ playerStore.queue.length }}</span>
+            </button>
+          </div>
+
+          <!-- 中间播放控制 -->
+          <div class="panel-controls-center">
+            <button class="ctrl-btn-lg" @click="playerStore.previous">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+              </svg>
+            </button>
+            <button class="play-btn-lg" @click="playerStore.togglePlay">
+              <svg v-if="!playerStore.isPlaying" width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <svg v-else width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+            </button>
+            <button class="ctrl-btn-lg" @click="playerStore.next">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- 右侧控制 -->
+          <div class="panel-controls-right">
+            <button class="ctrl-btn-sm" :class="{ active: showLyricsWindow }" @click="toggleLyricsWindow" title="桌面歌词">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h2v2H6zm4-4h8v2h-8zm0 4h8v2h-8z"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
 
     <!-- 底部播放栏 -->
-    <div class="player-bar" :style="bgStyle">
+    <div class="player-bar" :class="{ 'mini-mode-bar': isMiniMode }" :style="bgStyle" @mousedown="handleDragStart">
       <div class="song-info" @click="togglePanel">
         <div class="cover" :style="{ backgroundImage: playerStore.cover ? `url(${playerStore.cover})` : 'none' }">
           <div v-if="!playerStore.cover" class="cover-placeholder">♪</div>
@@ -805,8 +864,15 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- 迷你模式退出按钮 -->
+    <button v-if="isMiniMode" class="mini-exit-btn" @click.stop="toggleMiniMode" title="退出迷你模式">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      </svg>
+    </button>
+
     <Transition name="queue-panel">
-      <div v-if="playerStore.showQueue" class="queue-panel">
+      <div v-if="playerStore.showQueue && !isMiniMode" class="queue-panel">
         <div class="queue-header">
           <h3>播放队列 ({{ playerStore.queue.length }})</h3>
           <button v-if="playerStore.queue.length > 0" class="clear-btn" @click="playerStore.clearQueue">清空</button>
@@ -872,62 +938,62 @@ onUnmounted(() => {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0;
-  animation: fadeInOrb 0.8s ease forwards, var(--orb-animation);
+  opacity: 0.5;
+  animation: fadeInOrb 0.8s ease forwards;
   will-change: transform, opacity;
 }
 
 @keyframes fadeInOrb {
   from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 0.6; }
+  to { opacity: 0.5; }
 }
 
 .orb-1 {
   width: 500px;
   height: 500px;
-  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.4));
+  background: var(--accent-color-1-light, rgba(233, 69, 96, 0.6));
   top: 20%;
   left: 10%;
-  --orb-animation: floatOrb1 18s ease-in-out infinite 0.8s;
+  --orb-animation: floatOrb1 25s ease-in-out infinite 0.5s;
 }
 
 .orb-2 {
   width: 400px;
   height: 400px;
-  background: var(--accent-color-2-light, rgba(255, 138, 128, 0.4));
+  background: var(--accent-color-2-light, rgba(255, 138, 128, 0.6));
   top: 60%;
   right: 5%;
-  --orb-animation: floatOrb2 22s ease-in-out infinite 0.8s;
+  --orb-animation: floatOrb2 30s ease-in-out infinite 0.8s;
 }
 
 .orb-3 {
   width: 350px;
   height: 350px;
-  background: linear-gradient(135deg, var(--accent-color-1-light, rgba(233, 69, 96, 0.3)), var(--accent-color-2-light, rgba(255, 138, 128, 0.3)));
+  background: linear-gradient(135deg, var(--accent-color-1-light, rgba(233, 69, 96, 0.5)), var(--accent-color-2-light, rgba(255, 138, 128, 0.5)));
   bottom: 10%;
   left: 50%;
   transform: translateX(-50%);
-  --orb-animation: floatOrb3 25s ease-in-out infinite 0.8s;
+  --orb-animation: floatOrb3 35s ease-in-out infinite 1s;
 }
 
 @keyframes floatOrb1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(80px, 50px) scale(1.1); }
-  50% { transform: translate(40px, -40px) scale(0.95); }
-  75% { transform: translate(-60px, 30px) scale(1.05); }
+  25% { transform: translate(100px, 60px) scale(1.08); }
+  50% { transform: translate(50px, -50px) scale(0.95); }
+  75% { transform: translate(-80px, 40px) scale(1.05); }
 }
 
 @keyframes floatOrb2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(-70px, -60px) scale(1.05); }
-  50% { transform: translate(50px, 30px) scale(0.9); }
-  75% { transform: translate(-30px, 50px) scale(1.1); }
+  25% { transform: translate(-90px, -80px) scale(1.06); }
+  50% { transform: translate(60px, 40px) scale(0.92); }
+  75% { transform: translate(-40px, 60px) scale(1.08); }
 }
 
 @keyframes floatOrb3 {
   0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
-  33% { transform: translateX(-50%) translateY(-50px) scale(1.15); }
-  66% { transform: translateX(-50%) translateY(30px) scale(0.9); }
+  33% { transform: translateX(-50%) translateY(-60px) scale(1.12); }
+  66% { transform: translateX(-50%) translateY(40px) scale(0.92); }
 }
 
 .gradient-overlay {
@@ -1235,12 +1301,80 @@ onUnmounted(() => {
 .panel-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
+  justify-content: space-between;
+  gap: 16px;
   padding: 30px;
   background: rgba(255,255,255,0.8);
   backdrop-filter: blur(20px);
   border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.panel-controls-left,
+.panel-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100px;
+}
+
+.panel-controls-left {
+  justify-content: flex-start;
+}
+
+.panel-controls-right {
+  justify-content: flex-end;
+}
+
+.panel-controls-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  flex: 1;
+}
+
+.ctrl-btn-sm {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.ctrl-btn-sm:hover {
+  color: white;
+  background: var(--accent-color-1, var(--accent));
+  transform: scale(1.08);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+.ctrl-btn-sm.active {
+  color: white;
+  background: var(--accent-color-1, var(--accent));
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.panel-queue-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: var(--accent);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ctrl-btn-lg {
@@ -1687,5 +1821,90 @@ onUnmounted(() => {
 .queue-panel-leave-to {
   opacity: 0;
   transform: translateY(10px);
+}
+
+/* 迷你模式样式 */
+.mini-mode {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.mini-mode-bar {
+  height: 100vh !important;
+  width: 100vw !important;
+  border-top: none;
+  box-shadow: none;
+  cursor: move;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.mini-mode-bar .song-info {
+  width: auto;
+  flex: none;
+  gap: 8px;
+}
+
+.mini-mode-bar .song-info .cover {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.mini-mode-bar .details {
+  margin-right: 8px;
+}
+
+.mini-mode-bar .expand-icon {
+  display: none;
+}
+
+.mini-mode-bar .player-controls {
+  flex: none;
+}
+
+.mini-mode-bar .progress-section {
+  display: none;
+}
+
+.mini-mode-bar .extra-controls {
+  width: auto;
+}
+
+.mini-mode-bar .queue-panel {
+  display: none;
+}
+
+.mini-mode-bar .fullscreen-panel {
+  display: none;
+}
+
+.mini-exit-btn {
+  position: fixed;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.15);
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 300;
+  transition: all 0.2s ease;
+}
+
+.mini-exit-btn:hover {
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
 }
 </style>
