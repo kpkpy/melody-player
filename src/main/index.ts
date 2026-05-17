@@ -15,6 +15,7 @@ import { MiniWindowManager } from './miniWindowManager'
 import { musicEmotionAnalyzer } from './musicEmotionAnalyzer'
 import { YouTubeDownloader } from './youtubeDownloader'
 import { NcmConverter } from './ncmConverter'
+import { NeteasePlaylistImporter } from './neteasePlaylistImporter'
 import { initDatabase, getSongCover } from './database'
 
 // ===== 防止 EPIPE: broken pipe 导致主进程崩溃 =====
@@ -68,6 +69,7 @@ const statsManager = new StatsManager(musicLibrary)
 const miniWindowManager = new MiniWindowManager(win!)
 const youtubeDownloader = new YouTubeDownloader()
 const ncmConverter = new NcmConverter()
+const neteasePlaylistImporter = new NeteasePlaylistImporter()
 let desktopLyrics: DesktopLyricsWindow | null = null
 
 function createWindow() {
@@ -280,6 +282,20 @@ ipcMain.handle('playlist:removeSong', async (_, playlistId: string, songId: stri
 
 ipcMain.handle('playlist:delete', async (_, playlistId: string) => {
   return playlistManager.delete(playlistId)
+})
+
+ipcMain.handle('playlist:importNetease', async (_, url: string, cookies?: string) => {
+  if (cookies) {
+    neteasePlaylistImporter.setCookies(cookies)
+  }
+  return await neteasePlaylistImporter.importPlaylist(url, musicLibrary.getSongs(), {
+    create: (name: string) => playlistManager.create(name),
+    addSong: (id: string, songId: string) => playlistManager.addSong(id, songId),
+  })
+})
+
+ipcMain.handle('playlist:extractNeteaseId', async (_, url: string) => {
+  return neteasePlaylistImporter.extractPlaylistId(url)
 })
 
 // 同步相关

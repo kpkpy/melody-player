@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld('electron', {
     removeSong: (playlistId: string, songId: string) => 
       ipcRenderer.invoke('playlist:removeSong', playlistId, songId),
     delete: (playlistId: string) => ipcRenderer.invoke('playlist:delete', playlistId),
+    importNetease: (url: string, cookies?: string) => 
+      ipcRenderer.invoke('playlist:importNetease', url, cookies),
+    extractNeteaseId: (url: string) => 
+      ipcRenderer.invoke('playlist:extractNeteaseId', url),
   },
 
   ncm: {
