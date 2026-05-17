@@ -75,22 +75,64 @@ export class NeteasePlaylistImporter {
   async fetchPlaylist(playlistId: string): Promise<{ name: string; tracks: NetEasePlaylistTrack[] } | null> {
     try {
       const headers: Record<string, string> = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://music.163.com/',
+        'Origin': 'https://music.163.com',
       }
       if (this.cookies) {
         headers['Cookie'] = this.cookies
       }
 
-      const url = `https://music.163.com/api/playlist/detail?id=${playlistId}`
-      const response = await fetch(url, { headers })
-      const data: NetEasePlaylistResponse = await response.json()
+      // 尝试多个API端点
+      const apis = [
+        `https://music.163.com/api/v6/playlist/detail?id=${playlistId}&offset=0&total=true&limit=1000`,
+        `https://music.163.com/api/playlist/detail?id=${playlistId}`,
+      ]
 
-      if (data.code === 200 && data.playlist) {
-        return {
-          name: data.playlist.name,
-          tracks: data.playlist.tracks,
+      let lastError: Error | null = null
+
+      for (const api of apis) {
+        try {
+          console.log(`Trying API: ${api}`)
+          const response = await fetch(api, { headers })
+          
+          if (!response.ok) {
+            console.log(`API returned status: ${response.status}`)
+            continue
+          }
+
+          const text = await response.text()
+          console.log(`Response length: ${text.length}`)
+          
+          const data = JSON.parse(text)
+          console.log(`Response code: ${data.code}`)
+
+          if (data.code === 200) {
+            // v6 API 结构
+            if (data.playlist && Array.isArray(data.playlist.tracks)) {
+              console.log(`Found ${data.playlist.tracks.length} tracks`)
+              return {
+                name: data.playlist.name || '未知歌单',
+                tracks: data.playlist.tracks,
+              }
+            }
+            // 旧版API 结构
+            if (data.result && Array.isArray(data.result.tracks)) {
+              console.log(`Found ${data.result.tracks.length} tracks (result)`)
+              return {
+                name: data.result.name || '未知歌单',
+                tracks: data.result.tracks,
+              }
+            }
+          }
+        } catch (e: any) {
+          console.log(`API failed: ${e.message}`)
+          lastError = e
         }
+      }
+
+      if (lastError) {
+        console.error('All APIs failed:', lastError.message)
       }
     } catch (e: any) {
       console.error('Failed to fetch NetEase playlist:', e.message)

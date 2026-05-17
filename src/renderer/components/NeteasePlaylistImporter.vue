@@ -12,11 +12,17 @@
     </div>
 
     <div class="input-group">
-      <details>
-        <summary>高级选项（Cookies - 可选）</summary>
+      <details :open="lastError?.includes('fetch') || lastError?.includes('Cookie') ? true : false">
+        <summary>如何获取 Cookies？（导入失败时必选）</summary>
+        <div class="cookie-help">
+          <p>1. 在浏览器中打开 <a href="https://music.163.com" target="_blank">music.163.com</a> 并登录</p>
+          <p>2. 打开开发者工具（F12）→ Network（网络）标签</p>
+          <p>3. 刷新页面，找到任意请求，复制请求头中的 Cookie 值</p>
+          <p>4. 粘贴到下方输入框</p>
+        </div>
         <textarea
           v-model="cookies"
-          placeholder="如果遇到访问限制，可以填入浏览器Cookies..."
+          placeholder="粘贴 Cookie 字符串，例如：MUSIC_U=xxx; __csrf=xxx..."
           class="cookies-input"
           rows="3"
         ></textarea>
@@ -40,8 +46,11 @@
         <div v-if="result.unmatchedTracks.length > 0" class="unmatched">
           <h5>未匹配的歌曲（{{ result.unmatchedTracks.length }}）：</h5>
           <ul>
-            <li v-for="(track, index) in result.unmatchedTracks" :key="index">
+            <li v-for="(track, index) in result.unmatchedTracks.slice(0, 10)" :key="index">
               {{ track.title }} - {{ track.artist }}
+            </li>
+            <li v-if="result.unmatchedTracks.length > 10">
+              ... 还有 {{ result.unmatchedTracks.length - 10 }} 首
             </li>
           </ul>
         </div>
@@ -50,13 +59,16 @@
       <div v-else class="error">
         <h4>导入失败</h4>
         <p>{{ result.error }}</p>
+        <p v-if="result.error?.includes('fetch') || result.error?.includes('Failed')" class="error-tip">
+          💡 提示：网易云API需要登录Cookie才能访问，请在上方填入Cookies后重试
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const emit = defineEmits<{
   success: []
@@ -66,6 +78,7 @@ const playlistUrl = ref('')
 const cookies = ref('')
 const isImporting = ref(false)
 const result = ref<any>(null)
+const lastError = computed(() => result.value?.error)
 
 const handleImport = async () => {
   if (!playlistUrl.value || isImporting.value) return
@@ -128,6 +141,22 @@ h3 {
   border-color: #4a9eff;
 }
 
+.cookie-help {
+  padding: 8px 0;
+  font-size: 12px;
+  color: #999;
+  line-height: 1.6;
+}
+
+.cookie-help a {
+  color: #4a9eff;
+  text-decoration: none;
+}
+
+.cookie-help a:hover {
+  text-decoration: underline;
+}
+
 .cookies-input {
   width: 100%;
   padding: 8px 12px;
@@ -184,6 +213,15 @@ h3 {
   color: #ccc;
 }
 
+.error-tip {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #ffcc00;
+}
+
 .unmatched {
   margin-top: 12px;
   padding-top: 12px;
@@ -200,6 +238,8 @@ h3 {
   padding-left: 20px;
   color: #999;
   font-size: 13px;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
 .unmatched li {
@@ -213,5 +253,7 @@ details {
 
 summary {
   padding: 8px 0;
+  color: #4a9eff;
 }
 </style>
+
