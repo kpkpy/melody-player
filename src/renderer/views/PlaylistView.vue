@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useMusicStore } from '@/stores/music'
 import { usePlayerStore } from '@/stores/player'
-import NeteasePlaylistImporter from '@/components/NeteasePlaylistImporter.vue'
 
 const route = useRoute()
 const playlistStore = usePlaylistStore()
@@ -16,7 +15,6 @@ const songs = ref<any[]>([])
 const currentPage = ref(1)
 const pageSize = 50
 const hoveredSongId = ref<string | null>(null)
-const showImporter = ref(false)
 
 const totalPages = computed(() => Math.ceil(songs.value.length / pageSize))
 const paginatedSongs = computed(() => {
@@ -42,11 +40,6 @@ const loadPlaylist = () => {
       .map((id: string) => musicStore.songs.find(s => s.id === id))
       .filter(Boolean)
   }
-}
-
-const handleImportSuccess = () => {
-  playlistStore.loadPlaylists()
-  loadPlaylist()
 }
 
 const playSong = (song: any) => {
@@ -136,24 +129,9 @@ const removeSelected = async () => {
             </svg>
             添加到队列
           </button>
-          <button class="action-btn" @click="showImporter = true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
-            </svg>
-            导入网易云歌单
-          </button>
         </div>
       </div>
     </header>
-
-    <Teleport to="body">
-      <div v-if="showImporter" class="modal-overlay" @click="showImporter = false">
-        <div class="modal-content" @click.stop>
-          <button class="modal-close" @click="showImporter = false">×</button>
-          <NeteasePlaylistImporter @success="handleImportSuccess" />
-        </div>
-      </div>
-    </Teleport>
 
     <div class="song-list animate-fade-in-up delay-100">
       <div
@@ -495,50 +473,5 @@ const removeSelected = async () => {
   height: 1px;
   background: var(--border);
   margin: 6px 0;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  position: relative;
-  background: var(--glass);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  padding: 24px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  color: var(--text-primary);
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-}
-
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 </style>

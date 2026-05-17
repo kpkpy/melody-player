@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useRouter, useRoute } from 'vue-router'
+import NeteasePlaylistImporter from '@/components/NeteasePlaylistImporter.vue'
 
 const router = useRouter()
 const route = useRoute()
 const playlistStore = usePlaylistStore()
+const showImporter = ref(false)
 
 const navItems = [
   { path: '/', icon: '🏠', label: '首页' },
@@ -25,6 +28,11 @@ const createPlaylist = () => {
   if (name) {
     playlistStore.createPlaylist(name)
   }
+}
+
+const handleImportSuccess = () => {
+  playlistStore.loadPlaylists()
+  showImporter.value = false
 }
 </script>
 
@@ -48,7 +56,14 @@ const createPlaylist = () => {
     <div class="playlist-section">
       <div class="section-header animate-fade-in-up delay-200">
         <span>歌单</span>
-        <button class="add-btn" @click="createPlaylist">+</button>
+        <div class="header-actions">
+          <button class="add-btn" @click="showImporter = true" title="导入网易云歌单">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+            </svg>
+          </button>
+          <button class="add-btn" @click="createPlaylist" title="新建歌单">+</button>
+        </div>
       </div>
       <TransitionGroup name="playlist" tag="div" class="playlist-list">
         <button
@@ -62,6 +77,15 @@ const createPlaylist = () => {
         </button>
       </TransitionGroup>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showImporter" class="modal-overlay" @click="showImporter = false">
+        <div class="modal-content" @click.stop>
+          <button class="modal-close" @click="showImporter = false">×</button>
+          <NeteasePlaylistImporter @success="handleImportSuccess" />
+        </div>
+      </div>
+    </Teleport>
   </aside>
 </template>
 
@@ -143,6 +167,11 @@ const createPlaylist = () => {
   opacity: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .add-btn {
   width: 20px;
   height: 20px;
@@ -210,5 +239,50 @@ const createPlaylist = () => {
 
 .playlist-move {
   transition: transform 0.3s ease;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  background: var(--glass);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>
